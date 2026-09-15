@@ -229,6 +229,29 @@ def test_reported_lifetime_triggers_proactive_renewal():
 
 
 @pytest.mark.unit
+def test_the_engine_exp_sentinel_does_not_schedule_renewal():
+    """Live OLVM 4.5.5 (Keycloak) answers the token request with no expires_in and
+    ``"exp": "9223372036854775807"`` — Java Long.MAX as a string, i.e. "no expiry
+    stated". Reading it as a lifetime would schedule renewal never (or overflow);
+    renewal must stay reactive, on the 401."""
+    engine = Engine()
+    real_call = engine.__call__
+
+    def with_exp(request):
+        resp = real_call(request)
+        if request.url.path.endswith("/sso/oauth/token"):
+            body = resp.json()
+            body.update(exp="9223372036854775807", scope="ovirt-app-api")
+            return httpx.Response(200, json=body)
+        return resp
+
+    target = _target()
+    client = httpx.Client(base_url=target.origin, transport=httpx.MockTransport(with_exp))
+    conn = OlvmConnection(target, client=client)
+    assert conn._expires_at is None
+
+
+@pytest.mark.unit
 def test_close_revokes_the_token():
     engine = Engine()
     conn = _conn(engine)
