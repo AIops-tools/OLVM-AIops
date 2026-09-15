@@ -28,3 +28,6 @@ Notable, verified shapes:
 - `storagedomains_global.json` / `storagedomain_get.json`: the same domain globally, with
   **no status field at all**; the unattached Glance domain keeps `status: "unattached"`.
 - `storagedomain_disks.json`: the domain's disks (`lab-vm1-disk`, `ok`).
+
+Host hardware identifiers (manufacturer, product name, serial number) are replaced with
+placeholders, like the SSO session ids; nothing in the tool reads them.

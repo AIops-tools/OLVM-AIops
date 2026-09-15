@@ -9,7 +9,8 @@ AI-powered operations for **Oracle Linux Virtualization Manager (OLVM)** and
 an audit log that MCP and CLI calls both write to, a token/runaway budget guard,
 and descriptive risk tiers. Built for teams that run OLVM (often next to another
 hypervisor platform) and want an agent to answer "what needs attention?" with
-evidence from the engine, not guesses. No dependencies beyond `httpx` and the MCP SDK.
+evidence from the engine, not guesses. Built on `httpx` and the MCP SDK, not on the
+pycurl-based engine SDK.
 
 > **Read-only in this release**: inventory, health, capacity and diagnosis.
 > Engine actions are asynchronous — the engine answers `complete` long before a
@@ -35,6 +36,7 @@ the tool already guarantees and a ready-made system prompt for the rest.
 
 | Question | Tool | CLI |
 |---|---|---|
+| Is the engine itself healthy — certificates, backups, clock? | `engine_health_rca` | `olvm-aiops engine health` |
 | What is wrong with my hosts? | `host_health_rca` | `olvm-aiops host health` |
 | Is storage about to stop the engine creating disks? | `storage_capacity_rca` | `olvm-aiops storage capacity` |
 | Why is this VM paused / not responding? | `vm_health_rca` | `olvm-aiops vm health` |
@@ -42,15 +44,17 @@ the tool already guarantees and a ready-made system prompt for the rest.
 | What long-running operations failed? | `job_list` | `olvm-aiops job list --status failed` |
 | Inventory | `datacenter_list`, `cluster_list`, `host_list`/`host_get`, `storage_domain_list`/`storage_domain_get`, `vm_list`/`vm_get`, `vm_stats` | `datacenter`, `cluster`, `host`, `storage`, `vm` |
 
-**16 MCP tools**: 14 reads and diagnoses, plus the harness's `undo_list` /
+**17 MCP tools**: 15 reads and diagnoses, plus the harness's `undo_list` /
 `undo_apply` (which have nothing to undo in a read-only release).
 
 Each diagnosis ranks findings worst first; every finding carries the measured
 `signal`, a `cause`, an `action` and an explicit `rank`. Transient states are not
 reported as failures: a host the engine is installing or rebooting is "in
-progress", alert 9000 on a host without fencing hardware is informational, and a
-VM error event from before the VM's latest start is marked superseded. Host and
-VM events older than 24 hours (`events_window_hours`) are history, not findings.
+progress", alert 9000 on a host without fencing hardware is informational, and an
+event the host, VM or data center has since recovered from is marked superseded.
+Events older than 24 hours (`events_window_hours`) are history, not findings, and
+every warning-or-worse event inside the window lands in exactly one diagnosis —
+engine-wide alerts such as certificate expiry and missing backups included.
 
 ## Built from a live engine, not from the docs
 
@@ -64,6 +68,10 @@ enabled. Things that engine does, which this tool accounts for:
 - `/jobs` refuses any `search` and returns jobs oldest first, so jobs are sorted here;
 - the `time` search on events is unusable (formats return all or nothing), while
   `from=<index>` is an exact cursor — hence `after_index` and a client-side `since_minutes`;
+- the cursor sorted newest first returns the newest events above it and skips the rest, so
+  `after_index` reads oldest first;
+- `/ovirt-engine/services/health` answers without a login, and a data center's old status
+  alerts stay in the log after it recovers;
 - login events print the SSO session id, which is redacted before events are returned.
 
 ## Quick start
@@ -171,7 +179,8 @@ as a fallback with a deprecation warning (migrate with `olvm-aiops secret migrat
 
 ## Governance
 
-Every MCP tool passes through `@governed_tool`. It records; it does not authorize.
+Every MCP tool passes through `@governed_tool`, and every CLI command calls the MCP tool of the
+same name. It records; it does not authorize.
 
 - **Audit** — every call (tool, params with secrets redacted, result, status, duration, risk tier, and any operator-supplied approver/rationale) lands in `~/.olvm-aiops/audit.db` (relocate with `OLVM_AIOPS_HOME`).
 - **Budget / runaway guard** — a safety backstop, not an authorization gate: cumulative call and wall-time caps plus a tight-loop circuit breaker (`OLVM_MAX_TOOL_CALLS`, `OLVM_MAX_TOOL_SECONDS`, `OLVM_RUNAWAY_MAX`).
@@ -182,6 +191,7 @@ Every MCP tool passes through `@governed_tool`. It records; it does not authoriz
 
 | Area | Read | Write |
 |------|------|-------|
+| Engine | health diagnosis (health check, clock, certificates, backups) | — |
 | Hosts | list / get / health diagnosis | — |
 | Storage domains | list / get (data-center-scoped status, capacity) / capacity diagnosis | — |
 | VMs | list / get / statistics / health diagnosis | — |
@@ -194,7 +204,7 @@ Every MCP tool passes through `@governed_tool`. It records; it does not authoriz
 
 ## Scope & caveats
 
-- **Verification status**: every read and all three diagnoses were run end to end
+- **Verification status**: every read and all four diagnoses were run end to end
   against a live OLVM 4.5.5 engine with one KVM host, an NFS data domain and one VM.
   Not yet verified: production-scale engines, iSCSI / FC / Gluster domains, multi-host
   clusters, self-hosted engine deployments, or engines without Keycloak. See

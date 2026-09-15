@@ -44,6 +44,9 @@ def secret_set(
     password = resolve_master_password(confirm_if_new=True)
     if value is None:
         value = getpass.getpass(f"Password for '{name}' (hidden): ")
+    else:
+        console.print("[yellow]! --value leaves the password in shell history and the "
+                      "process list; omit it to be prompted instead.[/]")
     store = SecretStore.unlock(password)
     store.set(name, value)
     console.print(f"[green]✓ Stored encrypted password for '{name}' in {SECRETS_FILE}[/]")

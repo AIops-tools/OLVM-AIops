@@ -73,7 +73,9 @@ def _dc_views(conn: Any, dc_ids: set[str]) -> tuple[dict[str, dict], list[dict]]
             rows = u.items(conn.get(f"/datacenters/{_seg(dc_id)}/storagedomains"),
                            "storage_domain")
         except (OlvmApiError, ValueError) as exc:
-            errors.append({"dataCenterId": dc_id, "error": str(exc)[:300]})
+            # Engine text reaches the model: sanitise it like every other engine string.
+            errors.append({"dataCenterId": dc_id, "error": u.text(str(exc), 300),
+                           "timedOut": bool(getattr(exc, "timed_out", False))})
             continue
         for row in rows:
             if row.get("id"):

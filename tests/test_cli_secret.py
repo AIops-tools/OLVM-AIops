@@ -122,3 +122,27 @@ def test_secret_rotate_password_mismatch_aborts(store_env, monkeypatch):
     r = runner.invoke(app, ["secret", "rotate-password"])
     assert r.exit_code == 1
     assert "did not match" in r.output
+
+
+@pytest.mark.unit
+def test_secret_set_value_warns_about_shell_history(store_env):
+    from olvm_aiops.cli import app
+
+    r = runner.invoke(app, ["secret", "set", "engine1", "--value", "tok-123"])
+    assert r.exit_code == 0, r.output
+    assert "shell history" in " ".join(r.output.split())
+
+
+@pytest.mark.unit
+def test_store_repr_never_shows_the_master_password_or_secrets():
+    store = ss.SecretStore(_password="MASTER-PW-XYZ", _salt=b"0" * 16, _data={"t1": "engine-pw"})
+    assert "MASTER-PW-XYZ" not in repr(store) and "engine-pw" not in repr(store)
+
+
+@pytest.mark.unit
+def test_a_secret_store_error_is_one_line_not_a_traceback(store_env):
+    from olvm_aiops.cli import app
+
+    r = runner.invoke(app, ["secret", "rm", "nope"])
+    assert r.exit_code == 1 and isinstance(r.exception, SystemExit), r.exception
+    assert "No secret named 'nope'" in " ".join(r.output.split())

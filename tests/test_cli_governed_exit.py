@@ -55,12 +55,15 @@ def _callee(node: ast.AST) -> str | None:
     return None
 
 
-def _write_tool_names() -> set[str]:
+def _governed_tool_names() -> set[str]:
+    """Every MCP tool, reads included: a read that fails must not print an empty
+    table and exit 0 as if the engine had nothing to report."""
     names: set[str] = set()
     for path in TOOLS_DIR.glob("*.py"):
         tree = ast.parse(path.read_text())
         for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef) and "[WRITE]" in (ast.get_docstring(node) or ""):
+            doc = ast.get_docstring(node) if isinstance(node, ast.FunctionDef) else None
+            if doc and doc.startswith(("[READ]", "[WRITE]")):
                 names.add(node.name)
     return names
 
@@ -107,9 +110,9 @@ def _checker_names() -> set[str]:
 
 
 @pytest.mark.unit
-def test_every_cli_governed_write_result_is_checked():
-    tools = _write_tool_names()
-    assert tools, "no [WRITE] tools parsed — the invariant would vacuously pass"
+def test_every_cli_governed_result_is_checked():
+    tools = _governed_tool_names()
+    assert len(tools) >= 14, "governed tools not parsed — the invariant would vacuously pass"
     checkers = _checker_names()
     unchecked: list[str] = []
 
@@ -142,7 +145,7 @@ def test_every_cli_governed_write_result_is_checked():
                 unchecked.append(f"{path.name}:{node.lineno}:{_callee(node.func)}")
 
     assert not unchecked, (
-        "these CLI call sites print a governed write's result without routing it "
+        "these CLI call sites print a governed tool's result without routing it "
         f"through {sorted(checkers)}, so a refusal exits 0: {unchecked}"
     )
 

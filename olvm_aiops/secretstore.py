@@ -32,7 +32,7 @@ import logging
 import os
 import stat
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from cryptography.exceptions import InvalidKey
@@ -132,9 +132,11 @@ class SecretStore:
     re-encrypting to disk — instances are immutable.
     """
 
-    _password: str
-    _salt: bytes
-    _data: dict[str, str]
+    # repr=False: the default dataclass repr would print the master password and every
+    # decrypted secret into any traceback or log line that shows this object.
+    _password: str = field(repr=False)
+    _salt: bytes = field(repr=False)
+    _data: dict[str, str] = field(repr=False)
 
     # ── factory ────────────────────────────────────────────────────────────
     @classmethod

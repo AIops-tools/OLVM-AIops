@@ -15,6 +15,7 @@ older mcp/pydantic eval'd the union to ``types.UnionType`` and crashed the
 import functools
 import logging
 import os
+import threading
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Optional
@@ -26,6 +27,7 @@ from olvm_aiops import __version__
 from olvm_aiops.config import load_config
 from olvm_aiops.connection import ConnectionManager, OlvmApiError
 from olvm_aiops.governance import mark_unknown, sanitize
+from olvm_aiops.secretstore import SecretStoreError
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +68,9 @@ def _safe_error(exc: Exception, tool: str) -> str:
         TimeoutError,
         ConnectionError,
         OlvmApiError,
+        # A wrong or missing master password: the most common setup mistake. Its
+        # message says what to do; masking it leaves the agent with nothing.
+        SecretStoreError,
     )
     if isinstance(exc, _passthrough):
         return sanitize(str(exc), _ERROR_MAX)
@@ -113,18 +118,23 @@ mcp = MCPServer(
         "engine REST API (/ovirt-engine/api): inventory, health, capacity and "
         "troubleshooting of data centers, clusters, hosts, storage domains and VMs. "
         "Every tool runs through the olvm-aiops governance harness "
-        "(audit / budget / risk-tier / undo)."
+        "(audit / budget / risk-tier)."
     ),
 )
 
 _conn_mgr: Optional[ConnectionManager] = None
+# mcp 2.0 runs sync tools on worker threads: two first calls must share one manager,
+# or the overwritten manager's engine session is never revoked.
+_conn_mgr_lock = threading.Lock()
 
 
 def _get_connection(target: Optional[str] = None) -> Any:
     """Return an engine connection, lazily initialising the manager."""
     global _conn_mgr  # noqa: PLW0603
-    if _conn_mgr is None:
-        config_path_str = os.environ.get("OLVM_AIOPS_CONFIG")
-        config_path = Path(config_path_str) if config_path_str else None
-        _conn_mgr = ConnectionManager(load_config(config_path))
-    return _conn_mgr.connect(target)
+    with _conn_mgr_lock:
+        if _conn_mgr is None:
+            config_path_str = os.environ.get("OLVM_AIOPS_CONFIG")
+            config_path = Path(config_path_str) if config_path_str else None
+            _conn_mgr = ConnectionManager(load_config(config_path))
+        manager = _conn_mgr
+    return manager.connect(target)

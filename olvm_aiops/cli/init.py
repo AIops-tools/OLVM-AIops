@@ -11,9 +11,10 @@ import getpass
 
 import typer
 import yaml
+from rich.markup import escape
 
 from olvm_aiops.cli._common import cli_errors, console
-from olvm_aiops.config import CONFIG_DIR, CONFIG_FILE
+from olvm_aiops.config import CONFIG_DIR, CONFIG_FILE, TargetConfig
 from olvm_aiops.secretstore import SecretStore, resolve_master_password
 
 
@@ -72,6 +73,13 @@ def init_cmd() -> None:
             "engine.[/]"
         )
         username = typer.prompt("Username", default="admin@ovirt@internalsso").strip()
+        try:
+            # The same validation load_config applies: a target it would reject must
+            # not be written, or every later command fails on the whole file.
+            TargetConfig(name=name, url=url, username=username)
+        except ValueError as exc:
+            console.print(f"[red]{escape(str(exc))}[/] Let's try that target again.")
+            continue
 
         console.print(
             "[dim]To verify TLS against the engine CA, download it from "
@@ -102,8 +110,9 @@ def init_cmd() -> None:
 
     console.print(f"\n[green]✓ Setup complete.[/] Config: {CONFIG_FILE}")
     console.print(
-        "[dim]Tip: export OLVM_AIOPS_MASTER_PASSWORD=... in your shell profile "
-        "so the MCP server and CLI can unlock secrets non-interactively.[/]"
+        "[dim]Tip: the MCP server unlocks secrets from OLVM_AIOPS_MASTER_PASSWORD. Set it "
+        "in the MCP client's environment for this server only; exporting it from a shell "
+        "profile hands it to every process you start.[/]"
     )
     if typer.confirm("Run a connectivity check now (olvm-aiops doctor)?", default=True):
         from olvm_aiops.doctor import run_doctor

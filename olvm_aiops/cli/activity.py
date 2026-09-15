@@ -1,14 +1,15 @@
-"""CLI: engine events and jobs."""
+"""CLI: engine events and jobs.
+
+Every command calls the MCP tool of the same name in ``mcp_server.tools``, so it is
+audited like an MCP call (see ``olvm_aiops.cli.inventory``).
+"""
 
 from __future__ import annotations
 
-import json
-
 import typer
 
-from olvm_aiops.cli._common import TargetOption, cli_errors, console, get_connection
-from olvm_aiops.cli.inventory import JsonOption, LimitOption, _footer, _table
-from olvm_aiops.ops import activity
+from olvm_aiops.cli._common import TargetOption, cli_errors, console, governed
+from olvm_aiops.cli.inventory import JsonOption, LimitOption, _footer, _table, print_json
 
 event_app = typer.Typer(help="Engine events.", no_args_is_help=True)
 job_app = typer.Typer(help="Engine jobs (long-running operations).", no_args_is_help=True)
@@ -29,11 +30,13 @@ def event_list(
     target: TargetOption = None,
 ) -> None:
     """Engine events, newest first."""
-    conn, _ = get_connection(target)
-    out = activity.list_events(conn, limit=limit, min_severity=min_severity, page=page,
-                               after_index=after_index, since_minutes=since_minutes)
+    from mcp_server.tools import reads
+
+    out = governed(reads.event_list(limit=limit, min_severity=min_severity, page=page,
+                                    after_index=after_index, since_minutes=since_minutes,
+                                    target=target))
     if as_json:
-        console.print_json(json.dumps(out))
+        print_json(out)
         return
     _table("Events", ["index", "time", "severity", "code", "description"], out["events"])
     _footer(out)
@@ -51,10 +54,11 @@ def job_list(
     target: TargetOption = None,
 ) -> None:
     """Engine jobs with status and duration."""
-    conn, _ = get_connection(target)
-    out = activity.list_jobs(conn, limit=limit, status=status)
+    from mcp_server.tools import reads
+
+    out = governed(reads.job_list(limit=limit, status=status, target=target))
     if as_json:
-        console.print_json(json.dumps(out))
+        print_json(out)
         return
     _table("Jobs", ["status", "startTime", "durationSeconds", "description"], out["jobs"])
     _footer(out)

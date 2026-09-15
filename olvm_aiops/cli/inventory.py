@@ -1,4 +1,10 @@
-"""CLI: data centers, clusters and hosts (reads) plus host diagnosis."""
+"""CLI: data centers, clusters and hosts (reads) plus host diagnosis.
+
+Every command calls the MCP tool of the same name in ``mcp_server.tools``, so a CLI
+read runs through the same ``@governed_tool`` harness as the MCP server: an audit
+row, the budget and the runaway breaker. Calling ``olvm_aiops.ops`` directly would
+leave no trace in the audit log.
+"""
 
 from __future__ import annotations
 
@@ -8,15 +14,19 @@ import typer
 from rich.markup import escape
 from rich.table import Table
 
-from olvm_aiops.cli._common import TargetOption, cli_errors, console, get_connection
-from olvm_aiops.ops import diagnose, inventory
+from olvm_aiops.cli._common import TargetOption, cli_errors, console, governed
 
 datacenter_app = typer.Typer(help="Data centers.", no_args_is_help=True)
 cluster_app = typer.Typer(help="Clusters.", no_args_is_help=True)
 host_app = typer.Typer(help="KVM hosts: list, get, health diagnosis.", no_args_is_help=True)
+engine_app = typer.Typer(help="The engine itself: health diagnosis.", no_args_is_help=True)
 
 LimitOption = typer.Option(100, "--limit", help="Rows to show (1-1000).")
 JsonOption = typer.Option(False, "--json", help="Print the full payload as JSON.")
+EventsLimitOption = typer.Option(200, "--events-limit", min=1, max=1000,
+                                 help="Recent warning+ events to correlate (1-1000).")
+EventsWindowOption = typer.Option(24, "--events-window-hours", min=1, max=720,
+                                  help="Ignore events older than this many hours.")
 
 
 def _cell(value: object) -> str:
@@ -37,15 +47,32 @@ def _footer(out: dict) -> None:
         console.print(f"[yellow]Showing {out['returned']} of more — raise --limit.[/]")
 
 
+def print_json(out: dict) -> None:
+    console.print_json(json.dumps(out))
+
+
+def print_findings(out: dict, subject_key: str) -> None:
+    if not out["findings"]:
+        console.print("[green]No findings.[/]")
+    for f in out["findings"]:
+        colour = {"critical": "red", "high": "red", "medium": "yellow"}.get(f["severity"], "dim")
+        # The severity label is bracketed; unescaped, rich reads "[info]" as markup and drops it.
+        label = escape(f"[{f['severity']}]")
+        console.print(f"[{colour}]{f['rank']}. {label} {escape(f.get(subject_key) or '-')}: "
+                      f"{escape(f['signal'])}[/]")
+        console.print(f"   cause: {escape(f['cause'])}\n   action: {escape(f['action'])}")
+
+
 @datacenter_app.command("list")
 @cli_errors
 def datacenter_list(limit: int = LimitOption, as_json: bool = JsonOption,
                     target: TargetOption = None) -> None:
     """Data centers with status and compatibility version."""
-    conn, _ = get_connection(target)
-    out = inventory.list_datacenters(conn, limit=limit)
+    from mcp_server.tools import reads
+
+    out = governed(reads.datacenter_list(limit=limit, target=target))
     if as_json:
-        console.print_json(json.dumps(out))
+        print_json(out)
         return
     _table("Data centers", ["name", "status", "compatibilityVersion", "local", "id"],
            out["dataCenters"])
@@ -57,10 +84,11 @@ def datacenter_list(limit: int = LimitOption, as_json: bool = JsonOption,
 def cluster_list(limit: int = LimitOption, as_json: bool = JsonOption,
                  target: TargetOption = None) -> None:
     """Clusters with compatibility version and CPU type."""
-    conn, _ = get_connection(target)
-    out = inventory.list_clusters(conn, limit=limit)
+    from mcp_server.tools import reads
+
+    out = governed(reads.cluster_list(limit=limit, target=target))
     if as_json:
-        console.print_json(json.dumps(out))
+        print_json(out)
         return
     _table("Clusters", ["name", "compatibilityVersion", "cpuType", "memoryOverCommitPct", "id"],
            out["clusters"])
@@ -74,10 +102,11 @@ def host_list(limit: int = LimitOption,
                                                 help="Engine query, e.g. 'status!=up'."),
               as_json: bool = JsonOption, target: TargetOption = None) -> None:
     """KVM hosts with status, SPM role and VM counts."""
-    conn, _ = get_connection(target)
-    out = inventory.list_hosts(conn, limit=limit, search=search)
+    from mcp_server.tools import reads
+
+    out = governed(reads.host_list(limit=limit, search=search, target=target))
     if as_json:
-        console.print_json(json.dumps(out))
+        print_json(out)
         return
     _table("Hosts", ["name", "status", "statusDetail", "spmStatus", "vmsActive", "address"],
            out["hosts"])
@@ -89,35 +118,52 @@ def host_list(limit: int = LimitOption,
 def host_get(host_id: str = typer.Argument(..., help="Host id (see 'host list')."),
              target: TargetOption = None) -> None:
     """One host, as JSON."""
-    conn, _ = get_connection(target)
-    console.print_json(json.dumps(inventory.get_host(conn, host_id)))
+    from mcp_server.tools import reads
+
+    print_json(governed(reads.host_get(host_id=host_id, target=target)))
 
 
 @host_app.command("health")
 @cli_errors
-def host_health(events_window_hours: int = typer.Option(
-            24, "--events-window-hours", min=1, max=720,
-            help="Ignore events older than this many hours."),
-        events_limit: int = typer.Option(200, "--events-limit",
-                                                 help="Recent warning+ events to correlate."),
+def host_health(events_window_hours: int = EventsWindowOption,
+                events_limit: int = EventsLimitOption,
                 as_json: bool = JsonOption, target: TargetOption = None) -> None:
     """What needs attention on hosts, worst first."""
-    conn, _ = get_connection(target)
-    out = diagnose.host_health_rca(conn, events_limit=events_limit,
-                                   events_window_hours=events_window_hours)
+    from mcp_server.tools import reads
+
+    out = governed(reads.host_health_rca(events_limit=events_limit,
+                                         events_window_hours=events_window_hours,
+                                         target=target))
     if as_json:
-        console.print_json(json.dumps(out))
+        print_json(out)
         return
     counts = ", ".join(f"{k}={v}" for k, v in sorted(out["hostStatusCounts"].items())) or "none"
-    console.print(f"{out['hostsEvaluated']} host(s): {counts}")
-    if not out["findings"]:
-        console.print("[green]No findings.[/]")
-    for f in out["findings"]:
-        colour = {"critical": "red", "high": "red", "medium": "yellow"}.get(f["severity"], "dim")
-        # The severity label is bracketed; unescaped, rich reads "[info]" as markup and drops it.
-        label = escape(f"[{f['severity']}]")
-        console.print(f"[{colour}]{f['rank']}. {label} {escape(f['host'] or '-')}: "
-                      f"{escape(f['signal'])}[/]")
-        console.print(f"   cause: {escape(f['cause'])}\n   action: {escape(f['action'])}")
+    console.print(f"{out['hostsEvaluated']} host(s): {escape(counts)}")
+    print_findings(out, "host")
     if out["hostsTruncated"] or out["eventsTruncated"]:
         console.print("[yellow]PARTIAL: the host or event scan was cut short.[/]")
+
+
+@engine_app.command("health")
+@cli_errors
+def engine_health(events_window_hours: int = EventsWindowOption,
+                  events_limit: int = EventsLimitOption,
+                  as_json: bool = JsonOption, target: TargetOption = None) -> None:
+    """Problems with the engine itself (health check, clock, certificates, backups)."""
+    from mcp_server.tools import reads
+
+    out = governed(reads.engine_health_rca(events_limit=events_limit,
+                                           events_window_hours=events_window_hours,
+                                           target=target))
+    if as_json:
+        print_json(out)
+        return
+    status = out["healthServlet"]["status"]
+    skew = out["clockSkewSeconds"]
+    version = out["engineVersion"] or "version not reported"
+    console.print(f"Engine {escape(version)}; health check "
+                  f"{'unreadable' if status is None else f'HTTP {status}'}; clock skew "
+                  f"{'not reported' if skew is None else f'{skew:+.1f} s'}")
+    print_findings(out, "subject")
+    if out["eventsTruncated"]:
+        console.print("[yellow]PARTIAL: the event scan was cut short.[/]")

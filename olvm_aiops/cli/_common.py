@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import functools
 from collections.abc import Callable
-from pathlib import Path
 from typing import Annotated, Any
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 
 console = Console()
 
@@ -33,8 +33,10 @@ def _cli_error_types() -> tuple[type[BaseException], ...]:
     """
     from olvm_aiops.connection import OlvmApiError
     from olvm_aiops.governance import BudgetExceeded, PolicyDenied
+    from olvm_aiops.secretstore import SecretStoreError
 
-    return (OlvmApiError, PolicyDenied, BudgetExceeded, KeyError, OSError, ValueError)
+    return (OlvmApiError, PolicyDenied, BudgetExceeded, SecretStoreError, KeyError, OSError,
+            ValueError)
 
 
 def cli_errors(fn: Callable) -> Callable:
@@ -50,7 +52,9 @@ def cli_errors(fn: Callable) -> Callable:
             message = str(e)
             if isinstance(e, KeyError):
                 message = f"Missing required key or environment variable: {message}"
-            console.print(f"[red]Error: {message}[/]")
+            # Engine text can contain "[/bold]"; unescaped, rich raises on it and the
+            # real error is replaced by a MarkupError traceback.
+            console.print(f"[red]Error: {escape(message)}[/]")
             raise typer.Exit(1) from e
 
     return wrapper
@@ -65,11 +69,10 @@ def governed(result: Any) -> dict:
     """Return a governed tool's result, or print its error and exit 1.
 
     The ``mcp_server.tools`` twins never raise: ``@tool_errors`` flattens every
-    failure — a refused self-target, a policy denial, an unreachable engine — into
-    ``{"error": ...}``. A CLI command that drops that on the floor goes on to
-    print its success line for an operation that did not happen, which is the
-    one thing a tool selling "governed and reversible" must never do. Route
-    every governed call through here.
+    failure — an unreachable engine, a refused login, a bad argument — into
+    ``{"error": ...}``. A CLI command that drops that on the floor prints an empty
+    table and exits 0 as if the engine had nothing to report. Route every governed
+    call through here.
     """
     # ``outcomeUnknown`` is judged BEFORE ``error``, matching the harness: a
     # write whose response was lost carries BOTH keys, and it is audited
@@ -77,22 +80,12 @@ def governed(result: Any) -> dict:
     # plain failure would tell a script the change did not happen and invite the
     # double-apply the payload's own note warns about.
     if isinstance(result, dict) and result.get("outcomeUnknown"):
-        console.print(f"[yellow]Outcome undetermined: {result.get('note') or ''}[/]")
+        console.print(f"[yellow]Outcome undetermined: {escape(str(result.get('note') or ''))}[/]")
         raise typer.Exit(EXIT_UNDETERMINED)
     if isinstance(result, dict) and result.get("error"):
-        console.print(f"[red]Error: {result['error']}[/]")
+        console.print(f"[red]Error: {escape(str(result['error']))}[/]")
         raise typer.Exit(1)
     return result if isinstance(result, dict) else {}
-
-
-def get_connection(target: str | None, config_path: Path | None = None) -> tuple[Any, Any]:
-    """Return a (conn, config) tuple for the given target."""
-    from olvm_aiops.config import load_config
-    from olvm_aiops.connection import ConnectionManager
-
-    cfg = load_config(config_path)
-    mgr = ConnectionManager(cfg)
-    return mgr.connect(target), cfg
 
 
 def dry_run_print(*, operation: str, api_call: str, parameters: dict | None = None) -> None:

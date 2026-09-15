@@ -80,19 +80,25 @@ def vm_stats(vm_id: str, target: Optional[str] = None) -> dict:
 @mcp.tool()
 @governed_tool(risk_level="low")
 @tool_errors("dict")
-def storage_capacity_rca(target: Optional[str] = None) -> dict:
+def storage_capacity_rca(events_limit: int = 200, events_window_hours: int = 24,
+                         target: Optional[str] = None) -> dict:
     """[READ] Storage-domain problems ranked worst first, in one call.
 
     Critical when free space is below the engine's critical blocker (the engine then
-    refuses new disks and snapshots); medium below the low-space warning or when thin
-    disks are committed beyond capacity; high when an attached domain is inactive,
-    unknown or mixed. Unattached domains such as the default image repository are
-    skipped. Report findings in rank order and quote their signal.
+    refuses new disks and snapshots); medium below the low-space warning, or when thin
+    disks are committed beyond capacity while space is low (low on its own); high when
+    an attached domain is inactive, unknown or mixed. Warning-or-worse events naming a
+    storage domain (for example "deactivated by system") are attached to it.
+    Unattached domains such as the default image repository are skipped. Report
+    findings in rank order and quote their signal.
 
     Args:
+        events_limit: Recent warning-or-worse events to correlate, 1-1000 (default 200).
+        events_window_hours: Ignore events older than this many hours, 1-720 (default 24).
         target: Engine target name from config; omit to use the default.
     """
-    return diagnose.storage_capacity_rca(_get_connection(target))
+    return diagnose.storage_capacity_rca(_get_connection(target), events_limit=events_limit,
+                                         events_window_hours=events_window_hours)
 
 
 @mcp.tool()
@@ -105,8 +111,10 @@ def vm_health_rca(events_limit: int = 200, events_window_hours: int = 24,
     High for VMs stuck not_responding/unknown, paused (often storage I/O errors or a
     full domain — check storage_capacity_rca), or down with high availability; medium
     for image_locked; info for VMs mid-transition; low for config changes waiting for
-    a restart. Recent warning-or-worse events naming a VM are attached to it. Down VMs
-    without HA are normal. Report findings in rank order and quote their signal.
+    a restart. Recent warning-or-worse events naming a VM are attached to it, one
+    finding per VM and code; an event is superseded (info) when the VM started after
+    it, or when the engine reported it back up and it is up now. Down VMs without HA
+    are normal. Report findings in rank order and quote their signal.
 
     Args:
         events_limit: Recent warning-or-worse events to correlate, 1-1000 (default 200).

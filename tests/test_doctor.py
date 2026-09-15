@@ -189,3 +189,21 @@ def test_permission_warning_surfaced(isolated_home, capsys):
     (isolated_home / "secrets.enc").chmod(0o644)
     assert run_doctor(skip_auth=True) == 0
     assert "should be 600" in _out(capsys)
+
+
+def test_wrong_master_password_is_reported_not_raised(isolated_home, monkeypatch, capsys):
+    _write_config(isolated_home, [_target()])
+    _store_secret()
+    monkeypatch.setenv(ss.MASTER_PASSWORD_ENV, "not-the-master-password")
+    monkeypatch.setattr(ss, "_cached", None)
+    assert run_doctor(skip_auth=True) == 1
+    assert "Wrong master password" in _out(capsys)
+
+
+def test_engine_text_with_markup_does_not_break_the_report(isolated_home, ok_connection, capsys):
+    _write_config(isolated_home, [_target()])
+    _store_secret()
+    ok_connection.return_value.connect.return_value.get.return_value = {
+        "product_info": {"name": "[link=https://evil.example]Engine[/link]"}}
+    assert run_doctor() == 0
+    assert "[link=https://evil.example]Engine[/link]" in _out(capsys)

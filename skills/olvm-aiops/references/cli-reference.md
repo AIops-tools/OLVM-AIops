@@ -1,7 +1,10 @@
 # olvm-aiops — CLI reference
 
-Every command takes `--target/-t <name>` (default: the first target in `config.yaml`).
-Lists and diagnoses take `--json` for the full payload. Errors print one line and exit 1.
+Every engine command takes `--target/-t <name>` (default: the first target in `config.yaml`);
+`init`, `doctor`, `secret` and `mcp` do not. Lists and diagnoses take `--json` for the full
+payload. Each engine command calls the MCP tool of the same name, so it is audited like an MCP
+call. Errors print one line and exit 1; an invalid option value exits 2, as does `undo apply`
+when an outcome is undetermined.
 
 ## Setup & health
 
@@ -15,8 +18,9 @@ olvm-aiops mcp                       # run the MCP server over stdio
 ## Diagnosis
 
 ```bash
+olvm-aiops engine health [--events-window-hours 24] [--events-limit 200] [--json]
 olvm-aiops host health [--events-window-hours 24] [--events-limit 200] [--json]
-olvm-aiops storage capacity [--json]
+olvm-aiops storage capacity [--events-window-hours 24] [--events-limit 200] [--json]
 olvm-aiops vm health [--events-window-hours 24] [--events-limit 200] [--json]
 ```
 
@@ -42,7 +46,7 @@ olvm-aiops vm stats <vm-id>
 ```bash
 olvm-aiops event list [--min-severity warning] [--limit 100] [--json]
 olvm-aiops event list --page 2                    # older events
-olvm-aiops event list --after-index 1234          # only events newer than index 1234
+olvm-aiops event list --after-index 1234          # events after index 1234, oldest first (not with --page)
 olvm-aiops event list --since-minutes 60          # last hour (client-side on event time)
 olvm-aiops job list [--status failed] [--limit 100] [--json]
 ```
@@ -79,5 +83,6 @@ olvm-aiops secret migrate            # import a legacy plaintext .env
 ## Truncation
 
 Tables print a yellow line when more rows exist than `--limit` showed; diagnoses print
-`PARTIAL` when their host, VM or event scan was cut short. In `--json`, read `truncated`,
-`scanTruncated`, `hostsTruncated`, `vmsTruncated` and `eventsTruncated`.
+`PARTIAL` when their host, VM, storage-domain or event scan was cut short. In `--json`, read
+`truncated`, `scanTruncated`, `hostsTruncated`, `vmsTruncated`, `domainsTruncated` and
+`eventsTruncated` (true only when the event window itself was cut).

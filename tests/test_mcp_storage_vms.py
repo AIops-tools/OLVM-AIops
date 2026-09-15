@@ -42,7 +42,7 @@ def wired(monkeypatch):
               f"/datacenters/{dc_id}/storagedomains": run("datacenter_storagedomains"),
               f"/storagedomains/{nfs['id']}": run("storagedomain_get"),
               "/vms": run("vms"), f"/vms/{vm['id']}": vm,
-              f"/vms/{vm['id']}/statistics": run("vm_statistics")}
+              f"/vms/{vm['id']}/statistics": run("vm_statistics"), "/events": {}}
     conn = MagicMock()
     conn.get.side_effect = lambda path, params=None: routes[path]
     monkeypatch.setattr(tools, "_get_connection", lambda target=None: conn)

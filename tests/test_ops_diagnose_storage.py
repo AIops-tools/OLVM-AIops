@@ -38,6 +38,7 @@ def _conn(mutate_global=None, mutate_dc=None) -> MagicMock:
         mutate_dc(dcv["storage_domain"][0])
     routes = {"/storagedomains": glob, f"/datacenters/{dc_id}/storagedomains": dcv}
     conn = MagicMock()
+    routes.setdefault("/events", {})  # storage_capacity_rca also reads events
     conn.get.side_effect = lambda path, params=None: copy.deepcopy(routes[path])
     return conn
 
@@ -65,7 +66,7 @@ def test_below_the_low_space_warning_but_above_the_blocker_is_medium():
     def lowish(sd):
         sd["available"], sd["used"] = str(40 * GIB), str(460 * GIB)   # 8% free, 40 GiB > 5
     f = _only(dg.storage_capacity_rca(_conn(mutate_global=lowish)))
-    assert f["severity"] == "medium" and "free 8.0% < low-space warning 10%" in f["signal"]
+    assert f["severity"] == "medium" and "free 8.00% < low-space warning 10%" in f["signal"]
 
 
 def test_overcommit_alone_is_low_because_thin_provisioning_is_normal():

@@ -26,7 +26,12 @@ reports.
 - The password is exchanged once for an SSO access token
   (`/ovirt-engine/sso/oauth/token`); the token is held only in memory, sent as a
   Bearer header, and revoked (`/ovirt-engine/services/sso-logout`) when the
-  connection closes. Neither is logged or echoed.
+  connection closes — for the CLI, when the command exits. Neither is logged or
+  echoed.
+- Only `https://` engine URLs are accepted: login sends the password in the
+  request body.
+- A login the engine refuses is not retried for 60 s per target, so a wrong or
+  changed password cannot lock the engine account through repeated tool calls.
 - **Least privilege is the authorization boundary.** This tool does not decide
   what an agent may change; the engine does. Give it an account whose role only
   permits what you want done (for read-only use, a user with a read-only role
@@ -37,7 +42,8 @@ Every MCP tool runs through the bundled `@governed_tool` harness
 (`olvm_aiops.governance`):
 - **Audit** — every call logged to a local SQLite DB under `~/.olvm-aiops/`
   (relocatable via `OLVM_AIOPS_HOME`), agent-attributed, secret-redacted; the
-  CLI writes the same rows as the MCP server.
+  CLI writes the same rows as the MCP server, because every CLI command calls
+  the MCP tool of the same name.
 - **Token/runaway budget** — hard ceilings (`OLVM_MAX_TOOL_CALLS` /
   `OLVM_MAX_TOOL_SECONDS`) plus an on-by-default guard that trips a tight
   poll/retry loop.

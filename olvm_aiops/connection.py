@@ -26,7 +26,6 @@ import atexit
 import ssl
 import threading
 import time
-import weakref
 from typing import Any
 from urllib.parse import quote
 
@@ -52,10 +51,15 @@ def _seg(value: Any) -> str:
     """Percent-encode one URL *path segment* (agent-supplied ids).
 
     Prevents path traversal / smuggling when an id like ``../hosts`` is
-    interpolated into a REST path. Query parameters passed via httpx
-    ``params=`` must NOT go through this (httpx encodes those itself).
+    interpolated into a REST path. ``quote`` leaves ``.`` and ``..`` intact and
+    httpx would normalise them away (``/vms/..`` becomes the API root), so those
+    are refused outright — no engine id is a dot segment. Query parameters passed
+    via httpx ``params=`` must NOT go through this (httpx encodes those itself).
     """
-    return quote(str(value), safe="")
+    text = str(value)
+    if text in (".", ".."):
+        raise ValueError(f"'{text}' is not a valid engine id.")
+    return quote(text, safe="")
 
 
 def _tls_verify_failure(exc: BaseException) -> ssl.SSLCertVerificationError | None:
@@ -79,6 +83,24 @@ def _tls_message(origin: str, err: ssl.SSLCertVerificationError) -> str:
         f"to that name, not to an IP), point 'ca_file' at the engine CA "
         f"(/ovirt-engine/services/pki-resource?resource=ca-certificate&format=X509-PEM-CA), "
         f"or set verify_ssl: false on a throwaway lab engine only."
+    )
+
+
+def _connect_timeout_message(origin: str, timeout: float) -> str:
+    return (
+        f"Could not connect to {origin} within {timeout:g}s: nothing answered the "
+        f"connection attempt. The engine is unreachable — it is down, a firewall drops "
+        f"the port, or 'url' names the wrong host. A longer 'timeout' will not help."
+    )
+
+
+def _backoff_error(error: OlvmApiError, remaining: float) -> OlvmApiError:
+    return OlvmApiError(
+        f"{error} (Not retried: the last login failed "
+        f"{LOGIN_BACKOFF_SECONDS - remaining:.0f}s ago; the next attempt is allowed in "
+        f"{remaining:.0f}s, so a changed password cannot lock the account.)",
+        status_code=error.status_code,
+        path=error.path,
     )
 
 
@@ -158,7 +180,12 @@ class OlvmConnection:
         # Reads may run concurrently; renewal is serialised so an expired
         # token is replaced once, not once per thread.
         self._auth_lock = threading.Lock()
-        self._login()
+        try:
+            self._login()
+        except BaseException:
+            if client is None:
+                self._client.close()  # a failed login must not leak the client it opened
+            raise
 
     @property
     def target(self) -> TargetConfig:
@@ -178,6 +205,13 @@ class OlvmConnection:
                 data=data,
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
+        except httpx.ConnectTimeout as exc:
+            # Before TimeoutException (its parent): no connection was made at all.
+            raise OlvmApiError(
+                _connect_timeout_message(self._target.origin, self._target.timeout),
+                path=SSO_TOKEN_PATH,
+                timed_out=True,
+            ) from exc
         except httpx.TimeoutException as exc:
             raise OlvmApiError(
                 f"Login to {self._target.origin} timed out after "
@@ -228,8 +262,19 @@ class OlvmConnection:
         except ValueError:
             return {}
 
-    def _parse_success(self, resp: Any, path: str) -> Any:
+    def _parse_success(self, resp: Any, path: str, method: str) -> Any:
         if not resp.content:
+            if method == "GET":
+                # The engine answers even an empty collection with a JSON body ("{}").
+                # An empty GET body is something else answering — reading it as an empty
+                # collection would report "no hosts" and call that healthy.
+                raise OlvmApiError(
+                    f"The engine answered {path} with an empty body. Something other than "
+                    f"the engine API responded — check that 'url' is the engine origin and "
+                    f"that no proxy is in the way.",
+                    status_code=resp.status_code,
+                    path=path,
+                )
             return {}
         try:
             return resp.json()
@@ -263,7 +308,7 @@ class OlvmConnection:
                 status_code=resp.status_code,
                 path=path,
             )
-        return self._parse_success(resp, path)
+        return self._parse_success(resp, path, method)
 
     def _refresh_if_expired(self) -> None:
         if self._expires_at is None or time.monotonic() < self._expires_at:
@@ -284,14 +329,7 @@ class OlvmConnection:
             failed_at, error = self._login_failure
             remaining = LOGIN_BACKOFF_SECONDS - (time.monotonic() - failed_at)
             if remaining > 0:
-                raise OlvmApiError(
-                    f"{error} (Not retried: the last re-login failed "
-                    f"{LOGIN_BACKOFF_SECONDS - remaining:.0f}s "
-                    f"ago; the next attempt is allowed in {remaining:.0f}s, so a changed password "
-                    f"cannot lock the account.)",
-                    status_code=error.status_code,
-                    path=error.path,
-                ) from error
+                raise _backoff_error(error, remaining) from error
         try:
             self._login()
         except OlvmApiError as exc:
@@ -302,6 +340,12 @@ class OlvmConnection:
     def _send(self, method: str, path: str, **kwargs: Any) -> Any:
         try:
             return self._client.request(method, path, **kwargs)
+        except httpx.ConnectTimeout as exc:
+            raise OlvmApiError(
+                _connect_timeout_message(self._target.origin, self._target.timeout),
+                path=path,
+                timed_out=True,
+            ) from exc
         except httpx.TimeoutException as exc:
             # Before the generic branch: TimeoutException subclasses HTTPError,
             # and "check connectivity" would misdirect the operator.
@@ -324,6 +368,15 @@ class OlvmConnection:
 
     def get(self, path: str, **kwargs: Any) -> Any:
         return self.request("GET", path, **kwargs)
+
+    def probe(self, path: str) -> tuple[int, str]:
+        """GET an engine path outside the REST API (e.g. the health servlet).
+
+        Returns the status code and up to 500 characters of text; the body is not
+        parsed and a non-2xx status is returned, not raised — the caller judges it.
+        """
+        resp = self._send("GET", path)
+        return resp.status_code, (resp.text or "")[:500]
 
     def post(self, path: str, **kwargs: Any) -> Any:
         return self.request("POST", path, **kwargs)
@@ -359,6 +412,9 @@ class ConnectionManager:
     def __init__(self, config: AppConfig) -> None:
         self._config = config
         self._connections: dict[str, OlvmConnection] = {}
+        # A refused first login, per target. Without it a long-running MCP server with a
+        # changed password tries a fresh password login on every tool call.
+        self._failures: dict[str, tuple[float, OlvmApiError]] = {}
         # Two first calls at once must not each log in (one session would never be revoked).
         self._lock = threading.Lock()
         _MANAGERS.add(self)
@@ -378,7 +434,21 @@ class ConnectionManager:
             cached = self._connections.get(target.name)
             if cached is not None:
                 return cached
-            conn = OlvmConnection(target)
+            failure = self._failures.get(target.name)
+            if failure is not None:
+                failed_at, error = failure
+                remaining = LOGIN_BACKOFF_SECONDS - (time.monotonic() - failed_at)
+                if remaining > 0:
+                    raise _backoff_error(error, remaining) from error
+            try:
+                conn = OlvmConnection(target)
+            except OlvmApiError as exc:
+                # Only a login the engine answered and refused counts; an unreachable
+                # engine never sees the password, so it cannot lock the account.
+                if exc.status_code is not None:
+                    self._failures[target.name] = (time.monotonic(), exc)
+                raise
+            self._failures.pop(target.name, None)
             self._connections[target.name] = conn
             return conn
 
@@ -398,8 +468,11 @@ class ConnectionManager:
         return list(self._connections.keys())
 
 
-# Managers hold cached clients and live engine sessions; close them at exit.
-_MANAGERS: weakref.WeakSet[ConnectionManager] = weakref.WeakSet()
+# Managers hold cached clients and live engine sessions; close them at exit. The
+# reference is strong on purpose: a manager dropped without disconnect_all() (the
+# CLI's was, on every command) would be collected before exit and its engine
+# session never revoked.
+_MANAGERS: set[ConnectionManager] = set()
 
 
 def _close_all_managers() -> None:

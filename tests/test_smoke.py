@@ -15,6 +15,7 @@ import pytest
 from typer.testing import CliRunner
 
 EXPECTED_TOOLS = {
+    "engine_health_rca",
     "undo_list", "undo_apply",
     "datacenter_list", "cluster_list", "host_list", "host_get",
     "event_list", "job_list", "host_health_rca",
@@ -107,7 +108,8 @@ def test_mcp_list_tools_exposes_expected_tools():
     from mcp_server.server import mcp
 
     names = {t.name for t in asyncio.run(mcp.list_tools())}
-    assert EXPECTED_TOOLS <= names, f"missing: {EXPECTED_TOOLS - names}"
+    assert names == EXPECTED_TOOLS, (
+        f"missing: {EXPECTED_TOOLS - names}; unexpected: {names - EXPECTED_TOOLS}")
 
 
 @pytest.mark.unit
@@ -115,7 +117,7 @@ def test_every_mcp_tool_is_governed_by_harness():
     from mcp_server import server
 
     tool_objs = server.mcp._tool_manager._tools
-    assert EXPECTED_TOOLS <= set(tool_objs), "tool registry incomplete"
+    assert set(tool_objs) == EXPECTED_TOOLS, "tool registry differs from EXPECTED_TOOLS"
     for name, tool in tool_objs.items():
         fn = getattr(tool, "fn", None)
         assert fn is not None, f"{name} has no fn"

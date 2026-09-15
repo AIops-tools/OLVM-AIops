@@ -140,9 +140,9 @@ def test_fault_nested_under_a_fault_key_is_read_too():
 
 
 @pytest.mark.unit
-def test_empty_success_body_is_an_empty_dict():
+def test_empty_success_body_of_a_non_get_is_an_empty_dict():
     engine = Engine(api=lambda req: httpx.Response(200, content=b""))
-    assert _conn(engine).get("/x") == {}
+    assert _conn(engine).delete("/x") == {}
 
 
 @pytest.mark.unit
@@ -433,3 +433,148 @@ def test_concurrent_first_connections_share_one_session(monkeypatch):
     for th in threads:
         th.join()
     assert made == ["engine1"] and len({id(r) for r in results}) == 1
+
+
+# ─── review round 2 ─────────────────────────────────────────────────────────
+
+
+@pytest.mark.unit
+def test_plain_http_url_is_refused_because_login_would_send_the_password_in_clear():
+    with pytest.raises(ValueError, match="https://"):
+        _target(url="http://engine.example.com")
+
+
+@pytest.mark.unit
+def test_connect_timeout_at_login_says_unreachable_not_slow():
+    """Live: a black-holed address was reported as 'the engine accepted the connection'."""
+    def boom(request):
+        raise httpx.ConnectTimeout("timed out", request=request)
+
+    target = _target()
+    client = httpx.Client(base_url=target.origin, transport=httpx.MockTransport(boom))
+    with pytest.raises(OlvmApiError) as ei:
+        OlvmConnection(target, client=client)
+    assert "unreachable" in str(ei.value) and "accepted the connection" not in str(ei.value)
+    assert ei.value.timed_out is True
+
+
+@pytest.mark.unit
+def test_connect_timeout_on_a_request_says_unreachable():
+    def api(request):
+        raise httpx.ConnectTimeout("timed out", request=request)
+
+    with pytest.raises(OlvmApiError, match="unreachable"):
+        _conn(Engine(api=api)).get("/hosts")
+
+
+@pytest.mark.unit
+def test_a_read_timeout_still_says_the_engine_accepted_the_connection():
+    def api(request):
+        raise httpx.ReadTimeout("slow", request=request)
+
+    with pytest.raises(OlvmApiError, match="accepted the connection"):
+        _conn(Engine(api=api)).get("/hosts")
+
+
+@pytest.mark.unit
+def test_a_refused_first_login_is_not_retried_inside_the_backoff(monkeypatch):
+    """Live-equivalent: 3 tool calls with a wrong password made 3 password logins."""
+    import olvm_aiops.connection as conn_mod
+
+    clock = {"t": 1000.0}
+    monkeypatch.setattr(conn_mod.time, "monotonic", lambda: clock["t"])
+    attempts: list[str] = []
+
+    def refuse(target):
+        attempts.append(target.name)
+        raise OlvmApiError("Engine SSO login failed (400)", status_code=400)
+
+    monkeypatch.setattr(conn_mod, "OlvmConnection", refuse)
+    mgr = ConnectionManager(AppConfig(targets=(_target(),)))
+    for _ in range(3):
+        with pytest.raises(OlvmApiError):
+            mgr.connect()
+    assert attempts == ["engine1"]
+    with pytest.raises(OlvmApiError, match="Not retried"):
+        mgr.connect()
+    clock["t"] += conn_mod.LOGIN_BACKOFF_SECONDS + 1
+    with pytest.raises(OlvmApiError):
+        mgr.connect()
+    assert len(attempts) == 2
+
+
+@pytest.mark.unit
+def test_an_unreachable_engine_is_not_backed_off(monkeypatch):
+    """No answer means no password was checked, so nothing can be locked out."""
+    import olvm_aiops.connection as conn_mod
+
+    attempts: list[str] = []
+
+    def unreachable(target):
+        attempts.append(target.name)
+        raise OlvmApiError("Could not reach the engine")
+
+    monkeypatch.setattr(conn_mod, "OlvmConnection", unreachable)
+    mgr = ConnectionManager(AppConfig(targets=(_target(),)))
+    for _ in range(3):
+        with pytest.raises(OlvmApiError):
+            mgr.connect()
+    assert len(attempts) == 3
+
+
+@pytest.mark.unit
+def test_a_failed_login_closes_the_client_it_opened(monkeypatch):
+    import olvm_aiops.connection as conn_mod
+
+    engine = Engine(token_status=400)
+    closed: list[bool] = []
+    real_client = httpx.Client
+
+    class Tracking(real_client):
+        def close(self):
+            closed.append(True)
+            super().close()
+
+    monkeypatch.setattr(conn_mod.httpx, "Client", lambda **kw: Tracking(
+        base_url=kw["base_url"], transport=httpx.MockTransport(engine), headers=kw["headers"]))
+    with pytest.raises(OlvmApiError):
+        OlvmConnection(_target())
+    assert closed == [True]
+
+
+@pytest.mark.unit
+def test_an_empty_success_body_on_a_get_is_an_error_not_an_empty_collection():
+    engine = Engine(api=lambda req: httpx.Response(200, content=b""))
+    with pytest.raises(OlvmApiError, match="empty body"):
+        _conn(engine).get("/hosts")
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("bad", [".", ".."])
+def test_dot_segments_are_refused_as_ids(bad):
+    with pytest.raises(ValueError, match="not a valid engine id"):
+        _seg(bad)
+
+
+@pytest.mark.unit
+def test_a_manager_nobody_holds_is_still_closed_at_exit():
+    """The CLI dropped its manager on every command; a weak registry let it be collected
+    before exit, so the engine session it opened was never revoked."""
+    import gc
+
+    import olvm_aiops.connection as conn_mod
+
+    closed: list[bool] = []
+
+    class _Conn:
+        def close(self):
+            closed.append(True)
+
+    def make_and_drop():
+        mgr = ConnectionManager(AppConfig(targets=()))
+        mgr._connections["engine1"] = _Conn()
+
+    make_and_drop()
+    gc.collect()
+    conn_mod._close_all_managers()
+    assert closed == [True]

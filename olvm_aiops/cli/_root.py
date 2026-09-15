@@ -8,7 +8,7 @@ from olvm_aiops.cli._common import cli_errors
 from olvm_aiops.cli.activity import event_app, job_app
 from olvm_aiops.cli.doctor import doctor_cmd
 from olvm_aiops.cli.init import init_cmd
-from olvm_aiops.cli.inventory import cluster_app, datacenter_app, host_app
+from olvm_aiops.cli.inventory import cluster_app, datacenter_app, engine_app, host_app
 from olvm_aiops.cli.secret import secret_app
 from olvm_aiops.cli.storage_vms import storage_app, vm_app
 from olvm_aiops.cli.undo import undo_app
@@ -19,6 +19,7 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
+app.add_typer(engine_app, name="engine")
 app.add_typer(datacenter_app, name="datacenter")
 app.add_typer(cluster_app, name="cluster")
 app.add_typer(host_app, name="host")

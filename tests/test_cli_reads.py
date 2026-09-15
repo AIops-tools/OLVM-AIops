@@ -23,8 +23,9 @@ def load(case: str, name: str) -> dict:
 def _wire(monkeypatch, routes: dict) -> MagicMock:
     conn = MagicMock()
     conn.get.side_effect = lambda path, params=None: routes[path]
-    for mod in ("olvm_aiops.cli.inventory", "olvm_aiops.cli.activity"):
-        monkeypatch.setattr(f"{mod}.get_connection", lambda target=None: (conn, None))
+    from mcp_server.tools import reads
+
+    monkeypatch.setattr(reads, "_get_connection", lambda target=None: conn)
     return conn
 
 

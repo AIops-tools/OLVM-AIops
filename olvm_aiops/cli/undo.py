@@ -41,7 +41,7 @@ def undo_list_cmd(
     """List recorded, not-yet-applied undo tokens."""
     from mcp_server.tools import undo as gov
 
-    result = gov.undo_list(limit=limit, target=target)
+    result = governed(gov.undo_list(limit=limit, target=target))
     console.print_json(json.dumps(result))
     print_truncation_note(result, "undo tokens")
 

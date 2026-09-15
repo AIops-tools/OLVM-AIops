@@ -2,15 +2,16 @@
 
 Checks: config + encrypted secret store, then per target — engine reachability,
 SSO login (a wrong username profile or password surfaces as a failed check),
-and the engine's own product version and inventory summary.
+and the engine's own product version.
 """
 
 from __future__ import annotations
 
 from rich.console import Console
+from rich.markup import escape
 
 from olvm_aiops.config import CONFIG_FILE, ENV_FILE, load_config
-from olvm_aiops.secretstore import SECRETS_FILE, check_permissions, has_store
+from olvm_aiops.secretstore import SECRETS_FILE, SecretStoreError, check_permissions, has_store
 
 _console = Console()
 
@@ -22,7 +23,8 @@ def _version_text(root: dict) -> str:
     name = info.get("name") or "engine"
     version = info.get("version") if isinstance(info.get("version"), dict) else {}
     full = version.get("full_version")
-    return f"{name} {full}" if full else str(name)
+    # Engine-supplied text is printed inside rich markup: escape it.
+    return escape(f"{name} {full}" if full else str(name))
 
 
 def run_doctor(skip_auth: bool = False) -> int:
@@ -43,7 +45,7 @@ def run_doctor(skip_auth: bool = False) -> int:
     try:
         config = load_config()
     except Exception as exc:  # noqa: BLE001 — report, do not crash
-        _console.print(f"[red]✗ Config load failed: {exc}[/]")
+        _console.print(f"[red]✗ Config load failed: {escape(str(exc))}[/]")
         return 1
 
     if not config.targets:
@@ -72,8 +74,8 @@ def run_doctor(skip_auth: bool = False) -> int:
         try:
             _ = target.password
             _console.print(f"[green]✓ Password present for '{target.name}'[/]")
-        except OSError as exc:
-            _console.print(f"[red]✗ {exc}[/]")
+        except (OSError, SecretStoreError) as exc:
+            _console.print(f"[red]✗ {escape(str(exc))}[/]")
             problems += 1
         if not target.verify_ssl:
             _console.print(
@@ -97,7 +99,7 @@ def run_doctor(skip_auth: bool = False) -> int:
                 f"{target.username} — {_version_text(root)}[/]"
             )
         except Exception as exc:  # noqa: BLE001 — connectivity is a status, not a crash
-            _console.print(f"[red]✗ Connect to '{target.name}' failed: {exc}[/]")
+            _console.print(f"[red]✗ Connect to '{target.name}' failed: {escape(str(exc))}[/]")
             problems += 1
     mgr.disconnect_all()
 

@@ -98,9 +98,12 @@ class TargetConfig:
     timeout: float = DEFAULT_TIMEOUT
 
     def __post_init__(self) -> None:
-        if not self.url.startswith(("https://", "http://")):
+        if not self.url.startswith("https://"):
             raise ValueError(
-                f"Target '{self.name}': url must start with https:// (got '{self.url}')."
+                f"Target '{self.name}': url must start with https:// (got '{self.url}'). "
+                f"Login sends the account password in the request body, so a plain-http "
+                f"url would put it on the wire unencrypted; the engine serves its API over "
+                f"HTTPS."
             )
         if "@" not in self.username:
             raise ValueError(

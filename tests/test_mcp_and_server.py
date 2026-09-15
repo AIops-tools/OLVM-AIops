@@ -228,3 +228,31 @@ def _audit_tools(db_path):
         return [r[0] for r in conn.execute("SELECT tool FROM audit_log ORDER BY id")]
     finally:
         conn.close()
+
+
+@pytest.mark.unit
+def test_concurrent_first_tool_calls_share_one_connection_manager(monkeypatch):
+    import threading
+    import time as _time
+
+    import mcp_server._shared as shared
+
+    made: list[int] = []
+
+    class SlowManager:
+        def __init__(self, config):
+            _time.sleep(0.05)
+            made.append(1)
+
+        def connect(self, target=None):
+            return self
+
+    monkeypatch.setattr(shared, "_conn_mgr", None)
+    monkeypatch.setattr(shared, "ConnectionManager", SlowManager)
+    monkeypatch.setattr(shared, "load_config", lambda path=None: object())
+    threads = [threading.Thread(target=shared._get_connection) for _ in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert made == [1]

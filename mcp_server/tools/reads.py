@@ -4,7 +4,7 @@ from typing import Optional
 
 from mcp_server._shared import _get_connection, mcp, tool_errors
 from olvm_aiops.governance import governed_tool
-from olvm_aiops.ops import activity, diagnose, inventory
+from olvm_aiops.ops import activity, diagnose, engine_health, inventory
 
 
 @mcp.tool()
@@ -70,18 +70,20 @@ def host_get(host_id: str, target: Optional[str] = None) -> dict:
 def event_list(limit: int = 100, min_severity: str = "normal", page: int = 1,
                after_index: Optional[int] = None, since_minutes: Optional[int] = None,
                target: Optional[str] = None) -> dict:
-    """[READ] Engine events, newest first, at or above a severity.
+    """[READ] Engine events at or above a severity, newest first.
 
     To follow new events, pass the highest `index` you have already seen as
-    `after_index`. `since_minutes` keeps events from the last N minutes and sets
-    `scanTruncated` when older ones in the window may be missing. SSO session ids
-    in login events are redacted.
+    `after_index`: events after it come back OLDEST first (`order`), so repeat with the
+    highest index returned while `truncated` is true and nothing is skipped.
+    `since_minutes` keeps events from the last N minutes and sets `scanTruncated` when
+    older ones in the window may be missing. SSO session ids in login events are
+    redacted.
 
     Args:
         limit: Rows to return, 1-1000 (default 100); `truncated` says when more exist.
         min_severity: One of normal, warning, error, alert (default normal).
-        page: Older pages of events (not combinable with since_minutes).
-        after_index: Only events with a higher index than this.
+        page: Older pages of events (not combinable with since_minutes or after_index).
+        after_index: Only events with a higher index than this, oldest first.
         since_minutes: Only events from the last N minutes (1-129600).
         target: Engine target name from config; omit to use the default.
     """
@@ -126,3 +128,26 @@ def host_health_rca(events_limit: int = 200, events_window_hours: int = 24,
     """
     return diagnose.host_health_rca(_get_connection(target), events_limit=events_limit,
                                     events_window_hours=events_window_hours)
+
+
+@mcp.tool()
+@governed_tool(risk_level="low")
+@tool_errors("dict")
+def engine_health_rca(events_limit: int = 200, events_window_hours: int = 24,
+                      target: Optional[str] = None) -> dict:
+    """[READ] Problems with the engine itself, ranked worst first, in one call.
+
+    Reads the engine's health check, its version, its clock against this machine and
+    its summary counts, plus warning-or-worse events that name no host, VM or storage
+    domain: engine or CA certificate expiry, missing or failed engine backups, a
+    cluster failing its HA reservation. Those alerts appear in no other diagnosis, so
+    call this first for "is anything wrong". Report findings in rank order and quote
+    their signal.
+
+    Args:
+        events_limit: Recent warning-or-worse events to correlate, 1-1000 (default 200).
+        events_window_hours: Ignore events older than this many hours, 1-720 (default 24).
+        target: Engine target name from config; omit to use the default.
+    """
+    return engine_health.engine_health_rca(_get_connection(target), events_limit=events_limit,
+                                           events_window_hours=events_window_hours)

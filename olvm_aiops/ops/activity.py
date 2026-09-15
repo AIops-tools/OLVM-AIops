@@ -35,9 +35,14 @@ _SESSION = re.compile(r"(session\s+')[^']+(')", re.IGNORECASE)
 
 
 def redact(value: Any, limit: int = 1000) -> str | None:
-    """Engine text with SSO session ids removed; ``None`` when absent."""
-    raw = u.text(value, limit)
-    return _SESSION.sub(r"\1[redacted]\2", raw) if raw is not None else None
+    """Engine text with SSO session ids removed; ``None`` when absent.
+
+    Redacts BEFORE truncating: a cut can separate an id from its closing quote, and
+    the pattern then no longer matches the part that is left.
+    """
+    if isinstance(value, str):
+        value = _SESSION.sub(r"\1[redacted]\2", value)
+    return u.text(value, limit)
 
 
 def _ref(value: Any) -> dict | None:
@@ -76,10 +81,13 @@ def _severity_search(min_severity: str) -> str | None:
 def list_events(conn: Any, limit: int = u.DEFAULT_LIST_LIMIT, min_severity: str = "normal",
                 page: int = 1, after_index: int | None = None,
                 since_minutes: int | None = None) -> dict:
-    """[READ] Engine events, newest first, at or above ``min_severity``.
+    """[READ] Engine events at or above ``min_severity``, newest first.
 
-    ``page`` walks older events. ``after_index`` returns only events newer than
-    an index seen before (a cursor: pass the highest ``index`` you have).
+    ``page`` walks older events. ``after_index`` is a cursor: it returns the events
+    right after that index, OLDEST first (``order: oldestFirst``), so following it —
+    pass the highest ``index`` returned, repeat while ``truncated`` — skips nothing.
+    Newest-first with a cursor would return the newest events above it and silently
+    skip the ones in between (seen live: cursor 153 returned 173..169).
     ``since_minutes`` keeps events whose own timestamp is within that window; it
     scans up to ``ANALYSIS_LIST_LIMIT`` newest events and ``scanTruncated`` says
     when older ones inside the window may have been missed.
@@ -95,10 +103,16 @@ def list_events(conn: Any, limit: int = u.DEFAULT_LIST_LIMIT, min_severity: str 
         raise ValueError("since_minutes must be an integer between 1 and 129600 (90 days).")
     if since_minutes is not None and page > 1:
         raise ValueError("since_minutes cannot be combined with page; narrow the window instead.")
+    if after_index is not None and page > 1:
+        raise ValueError("after_index is a cursor: pass the highest index returned instead of "
+                         "paging.")
     limit = u.bounded_limit(limit)
-    base = [c for c in (_severity_search(min_severity), "sortby time desc") if c]
+    ascending = after_index is not None and since_minutes is None
+    base = [c for c in (_severity_search(min_severity),
+                        f"sortby time {'asc' if ascending else 'desc'}") if c]
     extra: dict[str, str] = {} if after_index is None else {"from": str(after_index)}
-    meta = {"minSeverity": min_severity, "page": page, "afterIndex": after_index}
+    meta = {"minSeverity": min_severity, "page": page, "afterIndex": after_index,
+            "order": "oldestFirst" if ascending else "newestFirst"}
 
     if since_minutes is not None:
         return {**_events_since(conn, base, extra, limit, since_minutes), **meta}

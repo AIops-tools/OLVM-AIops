@@ -16,13 +16,14 @@ what any model decides. Do not rely on prompt wording for this.
 |---|---|
 | "Don't invent a value when a field is missing" | A value the engine did not report comes back as `null`, never as `0`, `false` or `""`. |
 | "Numbers from the API are strings, convert them" | Counts, sizes and flags are converted to real integers and booleans; times to ISO-8601 UTC. |
-| "Tell me if the output was cut off" | Every limited listing returns `returned`, `limit` and a measured `truncated`; scans report `scanTruncated` / `hostsTruncated` / `vmsTruncated` / `eventsTruncated`. |
+| "Tell me if the output was cut off" | Every limited listing returns `returned`, `limit` and a measured `truncated`; scans report `scanTruncated` / `hostsTruncated` / `vmsTruncated` / `domainsTruncated` / `eventsTruncated` (the event flag means the window itself was cut). |
 | "Start with the worst problem" | Diagnoses return findings with an explicit `rank` (1 = worst). |
 | "Explain why something was flagged" | Every finding carries the measured `signal`, a `cause` and an `action`. |
 | "Don't treat a host being installed/rebooted as broken" | In-progress host states are `info` findings; alert 9000 (no fencing hardware) is `low`. |
-| "An old failed start doesn't mean the VM is broken now" | A VM error event older than the VM's latest start is superseded (`info`), even if the VM is down again; events older than `events_window_hours` (default 24) are not findings. |
+| "An old failed start doesn't mean the VM is broken now" | A VM event is superseded (`info`) when the VM started after it or the engine reported it back up; a host event when the engine set the host to Up afterwards; a data-center status event once the data center is up. Events older than `events_window_hours` (default 24) are not findings. |
 | "Don't blame the host for a storage or VM problem" | An event that names a VM or storage domain is not attributed to the host that ran it; repeats of one code on one host are one finding with a count. |
 | "A login page is not an empty inventory" | A non-JSON success response is an error, never an empty list. |
+| "Check the engine itself — certificates, backups" | `engine_health_rca` reads the health check and the clock, and reports the engine-wide alerts no other diagnosis sees. |
 | "Storage status: check the data center, not the global list" | Storage status is joined from each data center; `statusSource` says where it came from. |
 | "Don't leak credentials" | Passwords are encrypted at rest, tokens stay in memory, SSO session ids in events are redacted. |
 | "Log what you did" | Every call — MCP and CLI — writes an audit row to `~/.olvm-aiops/audit.db`. |
@@ -30,14 +31,15 @@ what any model decides. Do not rely on prompt wording for this.
 
 ## What still needs a prompt
 
-1. **Call the diagnosis first.** For "what is wrong", call `host_health_rca`,
-   `storage_capacity_rca` and `vm_health_rca` before reading raw lists.
+1. **Call the diagnoses first.** For "what is wrong", call `engine_health_rca`,
+   `host_health_rca`, `storage_capacity_rca` and `vm_health_rca` before reading raw lists.
 2. **Report in rank order and quote the signal.** Do not paraphrase numbers.
 3. **Severity words mean what they say.** `info` and `low` are not incidents.
 4. **A `null` is unknown.** Say "not reported", never "zero" or "none".
 5. **Do not claim completeness when a scan was cut.** If any `*Truncated` is true, say the answer
    is partial and how to widen it (`limit`, `events_limit`, `events_window_hours`, `page`).
-6. **Follow events with the cursor.** Keep the highest `index` and pass it as `after_index`.
+6. **Follow events with the cursor.** Pass the highest `index` returned as `after_index`; the
+   events after it come back oldest first — repeat while `truncated` is true.
 7. **Do not fabricate write operations.** This release cannot start, stop, migrate or snapshot;
    say so instead of describing a result.
 
@@ -45,19 +47,19 @@ what any model decides. Do not rely on prompt wording for this.
 
 ```text
 You operate an Oracle Linux Virtualization Manager engine through olvm-aiops tools.
-For "what is wrong" questions, call host_health_rca, storage_capacity_rca and vm_health_rca
-first. Report findings in rank order; quote each finding's signal exactly. info and low are
+For "what is wrong" questions, call engine_health_rca, host_health_rca, storage_capacity_rca
+and vm_health_rca first. Report findings in rank order; quote each finding's signal exactly. info and low are
 not incidents. A null value means the engine did not report it — say "not reported".
-If any truncated/scanTruncated/hostsTruncated/vmsTruncated/eventsTruncated field is true,
-say the answer is partial. To follow new events, pass the highest index you have seen as
-after_index. You cannot change anything in this release; never describe a change as done.
+If any truncated/scanTruncated/hostsTruncated/vmsTruncated/domainsTruncated/eventsTruncated
+field is true, say the answer is partial. To follow new events, pass the highest index returned
+as after_index and repeat while truncated is true. You cannot change anything in this release; never describe a change as done.
 ```
 
 Connect the tool with a read-only engine account as well — the prompt is not the boundary.
 
 ## If your model still struggles
 
-- Prefer the CLI (`olvm-aiops host health`, `storage capacity`, `vm health`): shorter output
+- Prefer the CLI (`olvm-aiops engine health`, `host health`, `storage capacity`, `vm health`): shorter output
   than MCP JSON.
 - Lower `limit` / `events_limit` so each result fits the context window; the truncation fields
   still say when more exists.

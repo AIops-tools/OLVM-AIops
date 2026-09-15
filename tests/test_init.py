@@ -123,3 +123,18 @@ def test_init_overwrite_existing_target(init_home):
     result = _run_init("engine1\ny\nhttps://engine2.example.com\n\n\n\nn\nn\n")
     assert result.exit_code == 0, result.output
     assert [t["url"] for t in _targets(init_home)] == ["https://engine2.example.com"]
+
+
+def test_init_rejects_a_username_without_its_profile_and_asks_again(init_home):
+    result = _run_init("engine1\nhttps://engine.example.com\nadmin\n"
+                       "engine1\nhttps://engine.example.com\n\n\n\nn\nn\n")
+    assert result.exit_code == 0, result.output
+    assert "must include its profile" in " ".join(result.output.split())
+    assert [t["username"] for t in _targets(init_home)] == ["admin@ovirt@internalsso"]
+
+
+def test_init_rejects_a_plain_http_url(init_home):
+    result = _run_init("engine1\nhttp://engine.example.com\n\n"
+                       "engine1\nhttps://engine.example.com\n\n\n\nn\nn\n")
+    assert result.exit_code == 0, result.output
+    assert [t["url"] for t in _targets(init_home)] == ["https://engine.example.com"]

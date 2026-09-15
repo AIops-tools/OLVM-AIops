@@ -79,6 +79,9 @@ Relocate everything with `OLVM_AIOPS_HOME`.
   no refresh token, so an expired token is renewed by logging in again, once, on a 401.
 - Neither the password nor the token is logged. SSO session ids that the engine prints in its
   login events are redacted before event text is returned.
+- Only `https://` URLs are accepted: login sends the password in the request body.
+- A login the engine refuses is not retried for 60 s, so a wrong password cannot lock the account
+  through repeated calls.
 - `verify_ssl: false` disables certificate checks entirely; use it only on a throwaway lab engine.
 - The tool makes no outbound calls other than to the configured engine URL.
 - This release has no write tools. Least privilege is still set on the engine account, which is

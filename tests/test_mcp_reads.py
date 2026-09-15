@@ -83,3 +83,13 @@ def _fixed_now(monkeypatch):
     import olvm_aiops.ops.diagnose as dg
 
     monkeypatch.setattr(dg.time, "time", lambda: 1789441200)  # 2026-09-15T03:00:00Z
+
+
+def test_a_wrong_master_password_reaches_the_agent_as_its_teaching_message(monkeypatch):
+    from olvm_aiops.secretstore import MasterPasswordError
+
+    def locked(target=None):
+        raise MasterPasswordError("Wrong master password (could not decrypt the secret store).")
+
+    monkeypatch.setattr(reads, "_get_connection", locked)
+    assert reads.host_list()["error"].startswith("Wrong master password")

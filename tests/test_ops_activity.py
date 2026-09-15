@@ -183,3 +183,47 @@ def test_last_page_is_not_truncated_and_a_short_page_needs_no_probe():
     out = act.list_events(engine, limit=4, page=3)
     assert [r["index"] for r in out["events"]] == [2, 1] and out["truncated"] is False
     assert len(engine.calls) == 1
+
+
+class CursorEngine:
+    """Applies `from` and the sort direction like the live engine."""
+
+    def __init__(self, n: int):
+        self.events = [{"index": str(i), "time": 1789440000000 + i, "severity": "normal",
+                        "code": "1"} for i in range(1, n + 1)]
+
+    def get(self, path, params=None):
+        rows = [e for e in self.events if int(e["index"]) > int(params.get("from", -1))]
+        ascending = "sortby time asc" in params.get("search", "")
+        rows.sort(key=lambda e: int(e["index"]), reverse=not ascending)
+        return {"event": rows[:int(params["max"])]}
+
+
+def test_the_after_index_cursor_returns_the_events_right_after_it_oldest_first():
+    """Live: cursor 153 with newest-first returned 173..169 and skipped 154..168 for good."""
+    out = act.list_events(CursorEngine(173), limit=5, after_index=153)
+    assert [r["index"] for r in out["events"]] == [154, 155, 156, 157, 158]
+    assert out["truncated"] is True and out["order"] == "oldestFirst"
+
+
+def test_following_the_cursor_sees_every_event_once():
+    engine, cursor, seen = CursorEngine(173), 153, []
+    while True:
+        out = act.list_events(engine, limit=5, after_index=cursor)
+        seen += [r["index"] for r in out["events"]]
+        if not out["truncated"]:
+            break
+        cursor = max(r["index"] for r in out["events"])
+    assert seen == list(range(154, 174))
+
+
+def test_after_index_cannot_be_combined_with_page():
+    with pytest.raises(ValueError, match="cursor"):
+        act.list_events(CursorEngine(3), after_index=1, page=2)
+
+
+def test_a_session_id_at_the_truncation_point_is_still_redacted():
+    # The cut at 1000 falls INSIDE the id: truncating first would leave "session 'ABCD…"
+    # with no closing quote, which the pattern cannot match.
+    text = "x" * 970 + " using session 'ABCDEFGHIJKLMNOPQRSTUVWXYZ012345' logged in."
+    assert "ABCDEFGH" not in act.redact(text, 1000)
