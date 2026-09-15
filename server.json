@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.AIops-tools/olvm-aiops",
+  "title": "XCP-ng AIops",
+  "description": "Governed XCP-ng ops via Xen Orchestra \u2014 29 MCP tools with audit, budget, undo guards.",
+  "repository": {
+    "url": "https://github.com/AIops-tools/OLVM-AIops",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "olvm-aiops",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

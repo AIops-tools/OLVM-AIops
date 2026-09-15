@@ -1,0 +1,204 @@
+"""Undo executor — list recorded inverse descriptors and APPLY them.
+
+Every governed write records a replayable inverse descriptor (tool + params) to
+``undo.db``. This module closes the loop: ``undo_apply`` looks up a recorded
+descriptor and dispatches it to the named governed tool, so the inverse runs on
+the SAME governance path as any other call (audited and budget-checked, and — if
+the inverse itself is destructive — recorded under its own risk tier). Whether
+the inverse *should* run is the caller's decision, exactly as for the original
+write; ``undo_apply`` records it either way.
+
+Note: recorded ``undo_params`` are the redacted safe-params captured at record
+time, so an inverse that would need a secret value cannot be replayed here — by
+design, inverses in this line key off ids/names, not credentials.
+"""
+
+import json
+from typing import Any, Optional
+
+from mcp_server._shared import mcp, tool_errors
+from olvm_aiops.governance import governed_tool
+from olvm_aiops.governance.undo import get_undo_store
+
+
+def _resolve_tool(name: str) -> Any:
+    """Return the governed callable registered under ``name`` (or None).
+
+    The CLI reaches this through ``undo apply``, whose process only imports
+    ``mcp_server.tools.undo`` — every other tool module is imported lazily inside
+    its own CLI command and so is absent here. Without forcing a full load,
+    ``undo_apply`` would fail with "inverse tool not registered" for every write
+    tool when driven from the CLI (the MCP entry point loads all modules, so it
+    never hit this). If the first lookup misses, import ``mcp_server.server`` —
+    which registers every ``@mcp.tool()`` as an import side effect — and retry.
+    Imported lazily to avoid the undo↔server cycle.
+    """
+    tool = mcp._tool_manager._tools.get(name)
+    if tool is None:
+        import mcp_server.server  # noqa: F401 — registers all tools as a side effect
+
+        tool = mcp._tool_manager._tools.get(name)
+    return getattr(tool, "fn", None) if tool else None
+
+
+@mcp.tool()
+@governed_tool(risk_level="low")
+@tool_errors("dict")
+def undo_list(limit: int = 50, target: Optional[str] = None) -> dict:
+    """[READ] List recorded, not-yet-applied undo tokens (most recent first).
+
+    Each entry names the original tool, the inverse tool that ``undo_apply``
+    would run, and a human note. Use the ``undoId`` with ``undo_apply``.
+
+    One extra row is read so ``truncated`` is measured rather than guessed from
+    the row count matching the limit; when it is true, older tokens exist.
+
+    Each entry carries ``effectVerified``. False means the original write
+    lost its response, so the change it reverses is PROBABLE, not confirmed —
+    check the live state before applying, and do not report the result as a
+    restore of a state that may never have been reached.
+
+    Args:
+        limit: Max rows to return (default 50, capped at 500).
+        target: Unused (undo state is host-local); accepted for CLI uniformity.
+    """
+    requested = max(1, min(int(limit), 500))
+    raw = get_undo_store().list(status="recorded", limit=requested + 1)
+    truncated = len(raw) > requested
+    rows = raw[:requested]
+    return {
+        "count": len(rows),
+        "returned": len(rows),
+        "limit": requested,
+        "truncated": truncated,
+        "undos": [
+            {
+                "undoId": r["undo_id"],
+                "ts": r["ts"],
+                "originalTool": r["tool"],
+                "inverseTool": r["undo_tool"],
+                "note": r.get("note", ""),
+                "effectVerified": bool(r.get("effect_verified", 1)),
+            }
+            for r in rows
+        ],
+    }
+
+
+def _origin_target(rec: dict) -> Optional[str]:
+    """The target the ORIGINAL write ran against, read from its recorded params.
+
+    Without this the replay goes to whatever target the caller names — in
+    practice the config's first entry — so on a multi-target config the inverse
+    runs against the wrong host. It only *looks* harmless because the resource
+    usually does not exist there; when two hosts both hold a resource with the
+    same name the inverse succeeds on the wrong one, silently.
+
+    Caught live on 2026-08-03 in container-host-aiops: a ``stop_container``
+    recorded against a Podman target replayed against a Portainer target.
+
+    A ``target`` in ``orig_params`` also means the original call accepted one,
+    so the fallback cannot hand a keyword to a tool that has no such parameter.
+    """
+    raw = rec.get("orig_params") or ""
+    try:
+        orig = json.loads(raw) if raw else {}
+    except (ValueError, TypeError):
+        return None  # unreadable: fall back to the caller/default, as before
+    if not isinstance(orig, dict):
+        return None
+    value = orig.get("target")
+    return value if isinstance(value, str) and value else None
+
+
+@mcp.tool()
+@governed_tool(risk_level="medium")
+@tool_errors("dict")
+def undo_apply(undo_id: str, dry_run: bool = False, target: Optional[str] = None) -> dict:
+    """[WRITE][risk=medium] Apply a recorded undo by dispatching its inverse tool.
+
+    The inverse runs through its own governed tool, so it is audited under its
+    own risk tier. Pass dry_run=True to preview the inverse call without
+    executing it. A token can only be applied once.
+
+    Args:
+        undo_id: The undoId from undo_list (or an ``_undo_id`` in a write result).
+        dry_run: If True, preview the inverse tool + params without running it.
+        target: Passed through to the inverse tool when it accepts a target.
+    """
+    store = get_undo_store()
+    rec = store.get(undo_id)
+    if not rec:
+        raise ValueError(f"Unknown undo id '{undo_id}'. Run undo_list to see available tokens.")
+    if rec["status"] != "recorded":
+        raise ValueError(
+            f"Undo '{undo_id}' is already '{rec['status']}' — a token can only be applied once."
+        )
+
+    inverse_tool = rec["undo_tool"]
+    # Unreadable parameters must stop the replay, not be replaced with {}.
+    # Defaulting dispatched the inverse tool with NO ARGUMENTS: for a tool whose
+    # parameters all have defaults that runs a real, unintended operation, and
+    # dry_run previewed it as a legitimate no-arg inverse. Refusing is the only
+    # honest answer — the recorded intent is gone, so there is nothing to apply.
+    raw = rec["undo_params"]
+    try:
+        params = json.loads(raw) if raw else {}
+    except (ValueError, TypeError) as exc:
+        raise ValueError(
+            f"Undo '{undo_id}' has unreadable recorded parameters, so its inverse "
+            f"cannot be replayed. Inspect the row in undo.db and re-run the "
+            f"inverse tool '{inverse_tool}' by hand if the change still needs "
+            f"reversing."
+        ) from exc
+    if not isinstance(params, dict):
+        raise ValueError(
+            f"Undo '{undo_id}' recorded parameters of type "
+            f"'{type(params).__name__}' rather than an object, so its inverse "
+            f"cannot be replayed. Re-run the inverse tool '{inverse_tool}' by hand."
+        )
+
+    fn = _resolve_tool(inverse_tool)
+    if fn is None:
+        raise ValueError(
+            f"Inverse tool '{inverse_tool}' is not registered on this server; cannot apply."
+        )
+
+    effect_verified = bool(rec.get("effect_verified", 1))
+    if dry_run:
+        return {
+            "dryRun": True,
+            "undoId": undo_id,
+            "effectVerified": effect_verified,
+            "wouldApply": {"tool": inverse_tool, "params": params},
+        }
+
+    call_params = dict(params)
+    if "target" not in call_params:
+        chosen = target if target is not None else _origin_target(rec)
+        if chosen is not None:
+            call_params["target"] = chosen
+    result = fn(**call_params)
+
+    # Only mark applied when the inverse did not itself return an error dict.
+    if not (isinstance(result, dict) and result.get("error")):
+        store.mark(undo_id, "applied")
+        applied = True
+    else:
+        applied = False
+
+    return {
+        "undoId": undo_id,
+        "applied": applied,
+        "effectVerified": effect_verified,
+        "inverseTool": inverse_tool,
+        "result": result,
+        "note": (
+            ""
+            if effect_verified
+            else "The original write lost its response, so it was never confirmed "
+            "to have taken effect. This inverse ran regardless; report the "
+            "CURRENT server state, not a restore that may have had nothing "
+            "to restore."
+        ),
+    }

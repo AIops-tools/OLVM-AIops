@@ -1,0 +1,21 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "olvm-aiops",
+  "displayName": "XCP-ng AIops",
+  "version": "0.1.0",
+  "description": "Governed XCP-ng ops via Xen Orchestra — 29 MCP tools with audit, budget, undo guards.",
+  "author": {
+    "name": "Wei Zhou",
+    "email": "zhouwei008@gmail.com",
+    "url": "https://github.com/AIops-tools"
+  },
+  "homepage": "https://github.com/AIops-tools/OLVM-AIops",
+  "repository": "https://github.com/AIops-tools/OLVM-AIops",
+  "license": "MIT",
+  "keywords": [
+    "aiops",
+    "mcp",
+    "governance",
+    "olvm"
+  ]
+}

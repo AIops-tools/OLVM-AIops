@@ -1,0 +1,24 @@
+{
+  "id": "olvm-aiops",
+  "name": "XCP-ng AIops",
+  "description": "Governed XCP-ng ops via Xen Orchestra — 29 MCP tools with audit, budget, undo guards.",
+  "skills": [
+    "./skills"
+  ],
+  "mcpServers": {
+    "olvm-aiops": {
+      "transport": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "olvm-aiops==0.1.0",
+        "olvm-aiops-mcp"
+      ]
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

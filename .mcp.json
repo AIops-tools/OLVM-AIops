@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "olvm-aiops": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "olvm-aiops==0.1.0",
+        "olvm-aiops-mcp"
+      ]
+    }
+  }
+}
