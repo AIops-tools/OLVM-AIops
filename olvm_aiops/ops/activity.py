@@ -10,7 +10,10 @@ Shapes and search behaviour verified on a live OLVM 4.5.5 engine:
     ``after_index`` (engine side) and ``since_minutes`` (filtered here on the
     event's own ``time``, over a bounded scan that reports when it was cut).
   * ``/jobs`` rejects ANY ``search`` parameter with HTTP 400 (the engine builds
-    an empty SQL WHERE clause), so jobs are fetched plainly and filtered here.
+    an empty SQL WHERE clause) and returns jobs OLDEST first (its own SQL orders
+    by start time ascending), so jobs are read in bulk, filtered and sorted
+    newest-first here — taking the first ``limit`` rows would hand back the
+    oldest jobs and call them recent.
   * the login event (code 30) prints the SSO session id in its description.
     Handing that to an agent puts a live session id into its context and the
     audit trail, so session ids are redacted before any text leaves this module.
@@ -131,17 +134,19 @@ def job_row(j: dict) -> dict:
 
 
 def list_jobs(conn: Any, limit: int = u.DEFAULT_LIST_LIMIT, status: str | None = None) -> dict:
-    """[READ] Engine jobs (long-running operations), optionally one status only.
+    """[READ] Engine jobs (long-running operations), newest first, optionally one status only.
 
-    The engine refuses a search on ``/jobs``, so the status filter is applied
-    here over a bounded read of up to ``ANALYSIS_LIST_LIMIT`` jobs; when that
-    read itself was cut short, ``scanTruncated`` says so — a filtered list is
-    then only a lower bound.
+    The engine refuses search and sort on ``/jobs`` and returns them oldest
+    first, so up to ``ANALYSIS_LIST_LIMIT`` jobs are read, sorted by start time
+    newest first and filtered here. ``scanTruncated`` means the engine held more
+    jobs than that read covered — the NEWEST ones may then be missing, because
+    the engine's own order puts them last.
     """
     if status is not None and status not in JOB_STATUSES:
         raise ValueError(f"status must be one of {', '.join(JOB_STATUSES)}.")
     limit = u.bounded_limit(limit)
     scan, scan_truncated = u.fetch_page(conn, "/jobs", "job", u.ANALYSIS_LIST_LIMIT)
+    scan = sorted(scan, key=lambda j: u.as_int(j.get("start_time")) or 0, reverse=True)
     rows = [job_row(j) for j in scan]
     if status is not None:
         rows = [r for r in rows if r["status"] == status]

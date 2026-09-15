@@ -125,3 +125,15 @@ def test_since_minutes_reports_a_cut_scan(monkeypatch):
     events = [{"index": str(i), "time": 2_000_000_000_000} for i in range(5)]
     out = act.list_events(_conn({"event": events}), limit=50, since_minutes=10)
     assert out["returned"] == 3 and out["scanTruncated"] is True
+
+
+def test_jobs_come_back_newest_first_although_the_engine_sends_oldest_first():
+    """Live: /jobs orders by start time ascending, so the first rows are the OLDEST."""
+    running = json.loads((LIVE.parent / "olvm-4.5.5-running" / "jobs.json").read_text())
+    starts = [int(j["start_time"]) for j in running["job"]]
+    assert starts == sorted(starts), "fixture premise: the engine answered oldest first"
+    out = act.list_jobs(_conn(running), limit=2)
+    got = [j["startTime"] for j in out["jobs"]]
+    assert got == sorted(got, reverse=True)
+    newest = max(running["job"], key=lambda j: int(j["start_time"]))
+    assert out["jobs"][0]["id"] == newest["id"]
