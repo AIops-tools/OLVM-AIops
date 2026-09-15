@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — v0.1.0
+## v0.1.0 — 2026-09-15
 
 First release of olvm-aiops: governed operations for Oracle Linux Virtualization
 Manager (OLVM) and upstream oVirt 4.5 engines, built from the AIops-tools line
