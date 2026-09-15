@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import re
 from unittest.mock import MagicMock
 
 import pytest
@@ -111,7 +112,8 @@ def test_since_minutes_filters_on_event_time_and_never_sends_a_time_search(monke
     conn = _conn({"event": events})
     out = act.list_events(conn, limit=50, since_minutes=5)
     params = conn.get.call_args.kwargs["params"]
-    assert "time" not in params["search"]
+    # "sortby time desc" is the sort clause; what must never be sent is a time comparison.
+    assert not re.search(r"\btime\s*[<>=]", params["search"]), params["search"]
     assert params["max"] == str(act.u.ANALYSIS_LIST_LIMIT + 1)
     assert [r["index"] for r in out["events"]] == [0, 1, 2, 3, 4, 5]
     assert out["scanTruncated"] is False and out["sinceMinutes"] == 5
