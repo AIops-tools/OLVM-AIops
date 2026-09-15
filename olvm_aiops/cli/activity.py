@@ -58,3 +58,6 @@ def job_list(
         return
     _table("Jobs", ["status", "startTime", "durationSeconds", "description"], out["jobs"])
     _footer(out)
+    if out.get("scanTruncated"):
+        console.print("[yellow]PARTIAL: the engine holds more jobs than were read, and it lists "
+                      "the newest last — the most recent jobs may be missing.[/]")

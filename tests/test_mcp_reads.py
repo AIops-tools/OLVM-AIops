@@ -29,7 +29,7 @@ def gov_home(tmp_path, monkeypatch):
 
 def _wire(monkeypatch, routes: dict) -> MagicMock:
     conn = MagicMock()
-    conn.get.side_effect = lambda path, params=None: routes.get(path, {})
+    conn.get.side_effect = lambda path, params=None: routes[path]
     monkeypatch.setattr(reads, "_get_connection", lambda target=None: conn)
     return conn
 
@@ -74,3 +74,12 @@ def test_read_tools_are_audited(monkeypatch, gov_home):
     finally:
         conn.close()
     assert ("host_list", "low") in rows
+
+
+@pytest.fixture(autouse=True)
+def _fixed_now(monkeypatch):
+    """Fixture events are from 2026-09-15 02:xx UTC. Pin "now" so the 24 h event window
+    does not turn these tests into a time bomb that fails a day later."""
+    import olvm_aiops.ops.diagnose as dg
+
+    monkeypatch.setattr(dg.time, "time", lambda: 1789441200)  # 2026-09-15T03:00:00Z

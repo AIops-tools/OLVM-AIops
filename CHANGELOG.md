@@ -18,3 +18,17 @@ template (vendored governance harness, encrypted secret store, CLI + MCP server)
   since 4.5.1), optional `ca_file` for the engine CA, and a per-target `timeout`.
 - `olvm-aiops init` wizard and `olvm-aiops doctor` (login + engine product
   version); passwords stored encrypted.
+- A 2xx response that is not JSON (a proxy error or SSO login page) is an error,
+  not an empty collection; after a failed re-login, renewals fail fast for 60 s
+  so a changed password cannot lock the account; concurrent first calls share
+  one engine session.
+- Reads: data centers, clusters, hosts, storage domains (status joined from each
+  data center), VMs and statistics, events (severity threshold, `page`,
+  `after_index` cursor, `since_minutes`) and jobs (newest first), each listing
+  with measured truncation.
+- Diagnoses `host_health_rca`, `storage_capacity_rca`, `vm_health_rca`: findings
+  ranked worst first with signal, cause and action. Host and VM events count only
+  from the last `events_window_hours` (default 24); host events are one finding
+  per code with a repeat count and are never taken from events about a VM or a
+  storage domain; any later VM start supersedes an earlier error event;
+  over-commit alone is low.

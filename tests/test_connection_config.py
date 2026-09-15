@@ -353,3 +353,83 @@ def test_manager_caches_per_target(monkeypatch):
     assert made == ["engine1", "engine2"]
     mgr.disconnect_all()
     assert mgr.list_connected() == []
+
+
+
+# ─── review follow-ups ──────────────────────────────────────────────────────
+
+
+@pytest.mark.unit
+def test_a_non_json_success_body_is_an_error_not_an_empty_inventory():
+    """A proxy or login page answering 200 must not make every host list empty."""
+    engine = Engine(api=lambda req: httpx.Response(200, text="<html>Sign in</html>",
+                                                   headers={"content-type": "text/html"}))
+    with pytest.raises(OlvmApiError) as ei:
+        _conn(engine).get("/hosts")
+    assert "non-JSON body" in str(ei.value) and "text/html" in str(ei.value)
+
+
+@pytest.mark.unit
+def test_a_failed_relogin_is_not_retried_inside_the_backoff(monkeypatch):
+    """Rotated password + expired token: each call used to attempt one more failed login."""
+    import olvm_aiops.connection as conn_mod
+
+    clock = {"t": 1000.0}
+    monkeypatch.setattr(conn_mod.time, "monotonic", lambda: clock["t"])
+    engine = Engine(api=lambda req: httpx.Response(401, json={}))
+    conn = _conn(engine)                      # initial login succeeds
+    engine.token_status = 401                 # the password was changed on the engine
+    for _ in range(3):
+        with pytest.raises(OlvmApiError):
+            conn.get("/vms")
+    assert engine.logins == 2, "one failed re-login, then fail fast"
+    clock["t"] += conn_mod.LOGIN_BACKOFF_SECONDS + 1
+    with pytest.raises(OlvmApiError):
+        conn.get("/vms")
+    assert engine.logins == 3, "a new attempt after the backoff"
+
+
+@pytest.mark.unit
+def test_backoff_clears_after_a_successful_login(monkeypatch):
+    import olvm_aiops.connection as conn_mod
+
+    clock = {"t": 1000.0}
+    monkeypatch.setattr(conn_mod.time, "monotonic", lambda: clock["t"])
+    state = {"deny": True}
+    engine = Engine(api=lambda req: httpx.Response(
+        401 if state["deny"] and req.headers["authorization"] == "Bearer TOK1" else 200,
+        json={"ok": True}))
+    conn = _conn(engine)
+    engine.token_status = 401
+    with pytest.raises(OlvmApiError):
+        conn.get("/vms")
+    engine.token_status = 200
+    clock["t"] += conn_mod.LOGIN_BACKOFF_SECONDS + 1
+    assert conn.get("/vms") == {"ok": True}
+    assert conn._login_failure is None
+
+
+@pytest.mark.unit
+def test_concurrent_first_connections_share_one_session(monkeypatch):
+    import time as _time
+
+    made: list[str] = []
+
+    class SlowConn:
+        def __init__(self, target):
+            _time.sleep(0.05)
+            made.append(target.name)
+            self.target = target
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr("olvm_aiops.connection.OlvmConnection", SlowConn)
+    mgr = ConnectionManager(AppConfig(targets=(_target(),)))
+    results: list = []
+    threads = [threading.Thread(target=lambda: results.append(mgr.connect())) for _ in range(4)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+    assert made == ["engine1"] and len({id(r) for r in results}) == 1

@@ -11,6 +11,7 @@ hardware. Neither is a failure, and neither is reported as one.
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from olvm_aiops.ops import _util as u
@@ -37,6 +38,22 @@ IN_PROGRESS = {"installing", "reboot", "connecting", "initializing",
                "preparing_for_maintenance", "pending_approval", "installing_os", "unassigned"}
 
 POWER_MGMT_UNVERIFIED = 9000
+#: Events older than this are history, not current evidence (hours).
+DEFAULT_EVENTS_WINDOW_HOURS = 24
+MAX_EVENTS_WINDOW_HOURS = 24 * 30
+
+
+def _window_cutoff_ms(hours: Any) -> int:
+    if isinstance(hours, bool) or not isinstance(hours, int) \
+            or not 1 <= hours <= MAX_EVENTS_WINDOW_HOURS:
+        raise ValueError(f"events_window_hours must be an integer between 1 and "
+                         f"{MAX_EVENTS_WINDOW_HOURS}.")
+    return int((time.time() - hours * 3600) * 1000)
+
+
+def _split_by_window(raw_events: list[dict], cutoff_ms: int) -> tuple[list[dict], int]:
+    recent = [e for e in raw_events if (u.as_int(e.get("time")) or 0) >= cutoff_ms]
+    return recent, len(raw_events) - len(recent)
 
 
 def _finding(severity: str, host: dict, signal: str, cause: str, action: str) -> dict:
@@ -70,6 +87,19 @@ def _status_findings(host: dict) -> list[dict]:
     return []
 
 
+def _external_findings(host: dict) -> list[dict]:
+    external = host["externalStatus"]
+    if external in ("error", "failure"):
+        return [_finding("high", host, f"external_status={external}",
+                         "An external system reported this host as failed.",
+                         "Check the external monitoring that set the status.")]
+    if external == "warning":
+        return [_finding("medium", host, "external_status=warning",
+                         "An external system raised a warning on this host.",
+                         "Check the external monitoring that set the status.")]
+    return []
+
+
 def _flag_findings(host: dict) -> list[dict]:
     out = []
     if host["reinstallationRequired"]:
@@ -85,13 +115,27 @@ def _flag_findings(host: dict) -> list[dict]:
 
 
 def _event_findings(host_by_id: dict[str, dict], events: list[dict]) -> list[dict]:
-    out = []
+    """Warning-or-worse events that are about a host, one finding per host and event code.
+
+    An event that also names a VM or a storage domain is about that object; the host
+    it carries is only where the operation ran (live: "Storage Domain … attached"
+    carries the executing host).
+    """
+    groups: dict[tuple[str, int | None], dict] = {}
     for ev in events:
-        ref = ev.get("host") or {}
-        host = host_by_id.get(ref.get("id") or "")
+        if ev.get("vm") or ev.get("storageDomain"):
+            continue
+        host = host_by_id.get((ev.get("host") or {}).get("id") or "")
         if host is None:
             continue
-        signal = f"event {ev['code']} {ev['severity']} at {ev['time']}: {ev['description']}"
+        key = (host["id"], ev["code"])
+        group = groups.setdefault(key, {"host": host, "latest": ev, "count": 0})
+        group["count"] += 1
+    out = []
+    for group in groups.values():
+        host, ev, count = group["host"], group["latest"], group["count"]
+        repeat = f" (×{count} in window)" if count > 1 else ""
+        signal = f"event {ev['code']} {ev['severity']} at {ev['time']}{repeat}: {ev['description']}"
         if ev["code"] == POWER_MGMT_UNVERIFIED:
             out.append(_finding("low", host, signal,
                                 "Power management (fencing) is not configured or not reachable. "
@@ -107,22 +151,28 @@ def _event_findings(host_by_id: dict[str, dict], events: list[dict]) -> list[dic
     return out
 
 
-def host_health_rca(conn: Any, events_limit: int = 200) -> dict:
+def host_health_rca(conn: Any, events_limit: int = 200,
+                    events_window_hours: int = DEFAULT_EVENTS_WINDOW_HOURS) -> dict:
     """[READ] Rank what needs attention on KVM hosts, worst first.
 
-    Combines host status, the engine's reinstall/update flags and recent
-    warning-or-worse events that name a host into one list of findings.
+    Combines host status, external status, the engine's reinstall/update flags and
+    warning-or-worse events from the last ``events_window_hours`` that are about a
+    host (repeats collapsed). Older events are history, counted in
+    ``eventsOutsideWindow`` but not reported.
     """
+    cutoff_ms = _window_cutoff_ms(events_window_hours)
     hosts_scan, hosts_truncated = u.fetch_page(conn, "/hosts", "host", u.ANALYSIS_LIST_LIMIT)
     hosts = [host_row(h) for h in hosts_scan]
     by_id = {h["id"]: h for h in hosts if h["id"]}
     events_scan, events_truncated = u.fetch_page(
         conn, "/events", "event", events_limit, search="severity>normal sortby time desc")
-    events = [event_row(e) for e in events_scan]
+    recent, outside = _split_by_window(events_scan, cutoff_ms)
+    events = [event_row(e) for e in recent]
 
     findings: list[dict] = []
     for host in hosts:
         findings += _status_findings(host)
+        findings += _external_findings(host)
         findings += _flag_findings(host)
     findings += _event_findings(by_id, events)
     findings.sort(key=lambda f: (SEVERITY_ORDER[f["severity"]], f["host"] or ""))
@@ -137,6 +187,8 @@ def host_health_rca(conn: Any, events_limit: int = 200) -> dict:
         "hostStatusCounts": statuses,
         "hostsTruncated": hosts_truncated,
         "eventsEvaluated": len(events),
+        "eventsOutsideWindow": outside,
+        "eventsWindowHours": events_window_hours,
         "eventsTruncated": events_truncated,
         "healthy": not any(f["severity"] in ("critical", "high", "medium") for f in ranked),
     }
@@ -171,9 +223,11 @@ def _sd_status_findings(sd: dict) -> list[dict]:
                             "Re-check after the operation; investigate if it does not settle.")]
     if status is None:
         return [_sd_finding("medium", sd, "status not readable",
-                            "The data center view of this attached domain could not be read "
-                            "(see statusErrors), so its state is unknown here.",
-                            "Check the account's permissions on the data center.")]
+                            "The domain is attached, but no status for it came back from its "
+                            "data center — the data center could not be read (statusErrors), "
+                            "or its storage-domain list did not include this domain.",
+                            "Check the account's permissions on the data center, then read "
+                            "the domain again (storage_domain_get).")]
     return []
 
 
@@ -197,8 +251,12 @@ def _sd_capacity_findings(sd: dict) -> list[dict]:
             f"({blocker} GiB)."))
     committed = sd["committedPctOfTotal"]
     if committed is not None and committed > 100 and total:
+        # Over-commit is normal for thin, template-based deployments; it is only urgent
+        # once space is also running low.
+        low_space = any("low-space warning" in f["signal"] or "critical blocker" in f["signal"]
+                        for f in out)
         out.append(_sd_finding(
-            "medium", sd, f"committed {committed}% of capacity",
+            "medium" if low_space else "low", sd, f"committed {committed}% of capacity",
             "Thin-provisioned disks are promised more space than the domain holds; writes "
             "can fail once they grow.",
             "Watch actual usage, or extend the domain before guests fill their disks."))
@@ -288,25 +346,31 @@ def _vm_state_findings(vm: dict) -> list[dict]:
 
 
 def _superseded_by_start(vm_raw_row: dict, event: dict) -> bool:
-    """True when the VM is up and its current run began after the event."""
-    if vm_raw_row.get("status") != "up":
-        return False
+    """True when the VM started after the event, whatever its state now.
+
+    A start after a failure proves the failure no longer holds; a later, normal
+    shutdown does not bring it back.
+    """
     started, happened = vm_raw_row.get("_startMs"), u.as_int(event.get("time"))
     return started is not None and happened is not None and started > happened
 
 
-def vm_health_rca(conn: Any, events_limit: int = 200) -> dict:
+def vm_health_rca(conn: Any, events_limit: int = 200,
+                  events_window_hours: int = DEFAULT_EVENTS_WINDOW_HOURS) -> dict:
     """[READ] Rank VM problems (stuck, paused, locked, HA down) worst first.
 
-    Adds pending-restart configuration changes and recent warning-or-worse events
-    that name an inventoried VM. Down VMs without high availability are normal.
+    Adds pending-restart configuration changes and warning-or-worse events from the
+    last ``events_window_hours`` that name an inventoried VM. Down VMs without high
+    availability are normal.
     """
+    cutoff_ms = _window_cutoff_ms(events_window_hours)
     vm_scan, vms_truncated = u.fetch_page(conn, "/vms", "vm", u.ANALYSIS_LIST_LIMIT)
     vms = [vm_row(v) for v in vm_scan]
     starts = {str(v.get("id")): u.as_int(v.get("start_time")) for v in vm_scan}
     by_id = {v["id"]: {**v, "_startMs": starts.get(v["id"])} for v in vms if v["id"]}
     ev_scan, events_truncated = u.fetch_page(
         conn, "/events", "event", events_limit, search="severity>normal sortby time desc")
+    ev_scan, outside = _split_by_window(ev_scan, cutoff_ms)
 
     findings: list[dict] = []
     for vm in vms:
@@ -344,6 +408,8 @@ def vm_health_rca(conn: Any, events_limit: int = 200) -> dict:
         "vmStatusCounts": statuses,
         "vmsTruncated": vms_truncated,
         "eventsEvaluated": len(ev_scan),
+        "eventsOutsideWindow": outside,
+        "eventsWindowHours": events_window_hours,
         "eventsTruncated": events_truncated,
         "healthy": not any(f["severity"] in ("critical", "high", "medium") for f in ranked),
     }

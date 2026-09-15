@@ -1,99 +1,58 @@
-# olvm-aiops — Capabilities (29 MCP tools: 19 read, 8 write, 2 undo)
+# olvm-aiops — Capabilities (16 MCP tools: 14 read, 2 undo)
 
-All tools go through the bundled `@governed_tool` harness (audit / policy /
-budget / undo / risk-tier). XO object ids are uuids; get them from the matching
-`*_list` tool first. Every tool takes an optional `target` (XO target name
-from config; omit for the default).
+Every tool is `[READ]`, `risk_level=low`, wrapped by `@governed_tool` (audited) and
+`@tool_errors` (failures come back as `{"error", "hint"}`). Engine: OLVM 4.5 / oVirt 4.5,
+REST API `/ovirt-engine/api`, JSON with `Version: 4`.
 
-**Listing envelopes.** `vm_list`, `sr_list`, `vdi_list`, `snapshot_list`,
-`task_list`, `backup_job_list`, `backup_log_list` and `undo_list` return
-`{<items>: [...], "returned": N, "limit": L, "truncated": bool}` — read the
-items under the named key (`vms`, `srs`, `vdis`, `snapshots`, `tasks`, `jobs`,
-`logs`, `undos`). `truncated` is measured, not guessed: filters run first, the
-cap after, and `backup_log_list` over-fetches one record. When it is true,
-re-run with a higher `limit`. The RCA tools report `inputTruncated` when the
-listing they correlated over was itself capped.
+Conventions in every payload:
+- A field the engine did not report is `null` — never an invented `0`, `false` or `""`.
+- Counts and sizes are real integers (the engine sends them as strings; they are converted).
+- Times are ISO-8601 UTC (the engine sends epoch milliseconds).
+- A listing with `limit` returns `returned`, `limit` and `truncated`; `truncated` is measured
+  by asking the engine for one extra row.
+- Findings carry `rank` (1 = worst), `severity`, `signal`, `cause`, `action`.
+- A 2xx answer that is not JSON (a proxy error or SSO login page) is an error, never an empty
+  collection.
 
-**Absent vs empty.** A field XO did not return is `null`, never `""` — do not
-infer a value for it.
+## Diagnosis
 
-**Authorization.** The tool records; it does not gate. Whether a write may run
-is the agent's decision or the connecting Xen Orchestra account's permissions —
-there is no read-only switch or approval gate. See `agent-guardrails.md`.
+| Tool | Reads | Findings |
+|---|---|---|
+| `host_health_rca` | `/hosts`, `/events?search=severity>normal sortby time desc` | high: `non_operational`, `non_responsive`, `install_failed`, `error`, `down`, `kdumping` (with `status_detail`); info: `installing`, `reboot`, `connecting`, `initializing`, `preparing_for_maintenance`, `maintenance`; medium: `reinstallation_required`; low: `update_available`; external status `error`/`failure` = high, `warning` = medium; host events from the last `events_window_hours` (default 24), one finding per host and event code with the repeat count (alert 9000 power-management = low). An event that also names a VM or storage domain is about that object and is not attributed to the host that ran it; older events are counted in `eventsOutsideWindow`. |
+| `storage_capacity_rca` | storage domains + each data center's storage domains | critical: free space below `critical_space_action_blocker` GiB (engine refuses new disks and snapshots); medium: free % below `warning_low_space_indicator`, external status warning; committed > 100 % of capacity — low on its own (thin provisioning), medium together with low space; high: attached domain `inactive` / `unknown` / `mixed`, external status error; info: maintenance or transitions; medium: status unreadable. Unattached domains are skipped. |
+| `vm_health_rca` | `/vms`, warning+ events | high: `not_responding`, `unknown`, `paused` (storage first), HA VM `down`; medium: `image_locked`; info: transitions (`migrating`, `powering_up`, …); low: config change pending restart; VM events from the last `events_window_hours` (default 24) — superseded (info) when older than the VM's latest start, whatever its state now |
 
-## Overview
+## Inventory
 
-| Tool | Risk | Description |
-|------|------|-------------|
-| `overview` | low | One-shot fleet health: pools, hosts (disabled / reboot-required / versions), VMs by power state + running-without-tools, SRs near full, recent backup failures. Start any triage here. |
+| Tool | Reads | Row highlights |
+|---|---|---|
+| `datacenter_list` | `/datacenters` | `status`, `compatibilityVersion`, `local`, `quotaMode` |
+| `cluster_list` | `/clusters` | `compatibilityVersion`, `cpuType` (null until a host joins), `memoryOverCommitPct`, `ballooningEnabled`, `upgradeInProgress` |
+| `host_list` / `host_get` | `/hosts` (`search` passed through) | `status`, `statusDetail`, `spmStatus`, `memoryBytes`, `maxSchedulingMemoryBytes`, `vmsActive`/`vmsTotal`, CPU topology, `osVersion`, `updateAvailable`, `reinstallationRequired` |
+| `storage_domain_list` / `storage_domain_get` | `/storagedomains` + `/datacenters/{id}/storagedomains` | `status` + `statusSource` (`dataCenter` / `global` / null), `master`, `availableBytes`, `usedBytes`, `committedBytes`, `totalBytes`, `usedPct`, `freePct`, `committedPctOfTotal`, thresholds; `statusErrors` |
+| `vm_list` / `vm_get` | `/vms` (`search` passed through) | `status`, `hostId`, `vcpus`, `memoryBytes`, `highAvailability`, `restartPendingForConfig`, `startTime`, `stopTime` |
+| `vm_stats` | `/vms/{id}/statistics` | `{name: {value, unit}}` — memory bytes, CPU %, network, `disks.usage`, `elapsed.time` |
 
-## VMs
+Why storage status is joined: an attached domain has no `status` in `/storagedomains`
+on a live engine; reading only that collection reports every attached domain as unknown.
 
-| Tool | Risk | Description |
-|------|------|-------------|
-| `vm_list(power_state?, pool?, limit?)` | low | VMs with power state, host, guest-tools status, sizing. |
-| `vm_get(vm_id)` | low | One VM: state, host, OS, tools, tags, start time. |
-| `vm_stats(vm_id, granularity?)` | low | Recent RRD averages: cpuAvgPercent, memoryUsedPercent. |
-| `vm_health_rca(vm_id?)` | low | **RCA**: halted-unexpectedly (auto-poweron/HA set), paused, suspended, guest-tools-missing, cpu-pressure (≥90%), memory-pressure (≥90%). Cause + severity + evidence + action per finding. Fleet mode caps stats pulls at 5 running VMs. |
-| `vm_start(vm_id, dry_run?)` | medium | Start a VM. **Undo: vm_stop** (recorded). |
-| `vm_stop(vm_id, force?, dry_run?)` | medium | Clean shutdown (hard with force). **Undo: vm_start** — only recorded if the VM was Running before. Refuses the VM declared as running XO (`xo_self_vm_uuid` on the target); with none declared there is **no** such guard — XO has no self endpoint, so it fails open rather than guess. `dry_run` refuses the declared uuid too, and returns `selfVmHint` (a possible IP coincidence, never a verdict, never a block — on either path). |
-| `vm_reboot(vm_id, force?, dry_run?)` | medium | Clean/hard reboot. Prior power state captured; **no undo**. |
-| `vm_migrate(vm_id, host_id, dry_run?)` | medium | Live-migrate. Captures the REAL source host before moving; **undo: migrate back to it**. |
+## Activity
 
-## Hosts
+| Tool | Parameters | Notes |
+|---|---|---|
+| `event_list` | `limit`, `min_severity` (normal/warning/error/alert), `page`, `after_index`, `since_minutes` | Newest first. `page` N is read with the engine's page size (`max=limit`) and `truncated` by probing page N+1 — one extra row there shifts every page and hides a row at each boundary (seen live). `after_index` uses the engine's `from=` cursor. `since_minutes` filters on each event's own time over a bounded scan; `scanTruncated` is true only when the scan was cut while its oldest event was still inside the window; the engine's `time` search is not used — on a live engine it returned all or nothing depending on date format. SSO session ids in login events are redacted. |
+| `job_list` | `limit`, `status` (started/finished/failed/aborted/unknown) | The engine refuses `search` on `/jobs` (HTTP 400) and returns jobs oldest first; jobs are read in bulk, sorted newest first and filtered here (`scanTruncated`). |
 
-| Tool | Risk | Description |
-|------|------|-------------|
-| `host_list(pool?)` | low | Hosts: version, enabled, reboot-required, memory %, resident VMs. |
-| `host_get(host_id)` | low | One host: version, build, memory, tags. |
+## Governance
 
-## Pools
+| Tool | Notes |
+|---|---|
+| `undo_list` / `undo_apply` | The harness undo log. This release has no writes, so nothing records an undo. |
 
-| Tool | Risk | Description |
-|------|------|-------------|
-| `pool_list()` | low | Pools with master, HA state, default SR. |
-| `pool_get(pool_id)` | low | One pool detail. |
-| `pool_patch_ha_posture(pool_id?)` | low | **RCA**: patches-missing, reboot-required, version-skew (high — breaks live migration), ha-disabled. Per-host rows + per-pool findings. |
+## Not in this release
 
-## SRs / VDIs
-
-| Tool | Risk | Description |
-|------|------|-------------|
-| `sr_list(pool?, limit?)` | low | SRs: capacity, physical usage %, virtual allocation. |
-| `sr_get(sr_id)` | low | One SR detail. |
-| `vdi_list(sr?, orphaned_only?, limit?)` | low | VDIs; `orphaned_only=true` → disks attached to no VM (reclaim candidates). |
-| `sr_usage_rca()` | low | **RCA**: sr-critical (≥95%), sr-near-full (≥85%), sr-overcommitted (allocation > capacity), orphaned-vdis with reclaimable bytes per SR. ISO SRs excluded. |
-| `sr_rescan(sr_id, dry_run?)` | medium | Metadata refresh; no data change, no undo. Lowest-impact write, but still a write. |
-
-## Snapshots
-
-| Tool | Risk | Description |
-|------|------|-------------|
-| `snapshot_list(vm_id?, limit?)` | low | VM snapshots with time and parent VM. |
-| `snapshot_create(vm_id, name, dry_run?)` | medium | Snapshot a VM. Captures the REAL new snapshot id from XO's response; **undo: delete THAT snapshot**. |
-| `snapshot_delete(snapshot_id, dry_run?)` | **high** | IRREVERSIBLE. Captures BEFORE state (name/time/VM); no undo. |
-| `snapshot_revert(snapshot_id, dry_run?)` | **high** | IRREVERSIBLE — replaces the VM's current state. Captures snapshot state; no undo. Take a fresh snapshot first. |
-
-## Backups
-
-| Tool | Risk | Description |
-|------|------|-------------|
-| `backup_job_list(limit?)` | low | VM backup jobs (id, name, mode). |
-| `backup_log_list(limit?)` | low | Recent run logs: status + failed-task messages. |
-| `backup_failure_rca(limit?)` | low | **RCA**: failures per job classified — vdi-chain (coalesce), quiesce (guest VSS), transport (remote unreachable), storage-full, unknown. Counts + sample findings + action per class. |
-
-## Tasks
-
-| Tool | Risk | Description |
-|------|------|-------------|
-| `task_list(status?, limit?)` | low | XO tasks (pending / success / failure). |
-
-## Write semantics
-
-- `dry_run=true` → preview dict (`{"dryRun": true, "would...": {...}}`). A dry-run **may
-  read** — resolving ids and evaluating guards is what lets it tell you the call would be
-  refused — but **never writes** and records **no undo**. It runs through `@governed_tool`
-  like any other call, so it is audited and it can be refused. The CLI `--dry-run` routes
-  through the same governed function, so both entry points behave identically.
-- Successful reversible writes return `_undo_id` referencing the recorded inverse descriptor in `~/.olvm-aiops/undo.db`. Undo execution is an external orchestrator's job — recording only.
-- High-risk tools (`snapshot_delete`, `snapshot_revert`) require a `dry_run` preview + double confirmation at the CLI. `OLVM_AUDIT_APPROVED_BY` / `OLVM_AUDIT_RATIONALE` are optional annotations recorded on the audit row — never required, never blocking.
+Writes of any kind. On a live engine, `POST /vms/{id}/start` answered HTTP 200 with
+`status: complete` in 0.23 s while the VM reached `up` 72.7 s later, and a start issued right
+after a disk add (201) was refused with 409 "disks are locked". A write tool must poll the
+object (or correlate events through a `Correlation-Id` header, which the engine honours)
+before reporting success.

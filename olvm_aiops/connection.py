@@ -42,6 +42,10 @@ from olvm_aiops.config import (
 )
 
 API_VERSION = "4"
+#: After a failed re-login, further renewals fail fast for this long. Retrying a
+#: rotated password on every call (and once per waiting thread) is how an account
+#: lockout policy locks the account.
+LOGIN_BACKOFF_SECONDS = 60.0
 
 
 def _seg(value: Any) -> str:
@@ -150,6 +154,7 @@ class OlvmConnection:
         )
         self._token: str | None = None
         self._expires_at: float | None = None
+        self._login_failure: tuple[float, OlvmApiError] | None = None
         # Reads may run concurrently; renewal is serialised so an expired
         # token is replaced once, not once per thread.
         self._auth_lock = threading.Lock()
@@ -223,6 +228,24 @@ class OlvmConnection:
         except ValueError:
             return {}
 
+    def _parse_success(self, resp: Any, path: str) -> Any:
+        if not resp.content:
+            return {}
+        try:
+            return resp.json()
+        except ValueError as exc:
+            # A proxy error page or an SSO login page answering 200 must not read as an
+            # empty inventory ("no hosts" -> healthy).
+            headers = getattr(resp, "headers", None) or {}
+            ctype = headers.get("content-type", "unknown")
+            raise OlvmApiError(
+                f"The engine answered {path} with a non-JSON body (content-type {ctype}). "
+                f"Something other than the engine API responded — check that 'url' is the "
+                f"engine origin and that no proxy or login page is in the way.",
+                status_code=resp.status_code,
+                path=path,
+            ) from exc
+
     def request(self, method: str, path: str, **kwargs: Any) -> Any:
         """Issue an API request (path relative to /ovirt-engine/api) and return JSON."""
         self._refresh_if_expired()
@@ -240,20 +263,41 @@ class OlvmConnection:
                 status_code=resp.status_code,
                 path=path,
             )
-        return self._json(resp)
+        return self._parse_success(resp, path)
 
     def _refresh_if_expired(self) -> None:
         if self._expires_at is None or time.monotonic() < self._expires_at:
             return
         with self._auth_lock:
             if self._expires_at is not None and time.monotonic() >= self._expires_at:
-                self._login()
+                self._relogin()
 
     def _renew(self, seen: str | None) -> None:
         """Log in again unless another thread already replaced the token ``seen``."""
         with self._auth_lock:
             if self._client.headers.get("Authorization") == seen:
-                self._login()
+                self._relogin()
+
+    def _relogin(self) -> None:
+        """Re-authenticate (lock held), failing fast inside the backoff after a failure."""
+        if self._login_failure is not None:
+            failed_at, error = self._login_failure
+            remaining = LOGIN_BACKOFF_SECONDS - (time.monotonic() - failed_at)
+            if remaining > 0:
+                raise OlvmApiError(
+                    f"{error} (Not retried: the last re-login failed "
+                    f"{LOGIN_BACKOFF_SECONDS - remaining:.0f}s "
+                    f"ago; the next attempt is allowed in {remaining:.0f}s, so a changed password "
+                    f"cannot lock the account.)",
+                    status_code=error.status_code,
+                    path=error.path,
+                ) from error
+        try:
+            self._login()
+        except OlvmApiError as exc:
+            self._login_failure = (time.monotonic(), exc)
+            raise
+        self._login_failure = None
 
     def _send(self, method: str, path: str, **kwargs: Any) -> Any:
         try:
@@ -315,6 +359,8 @@ class ConnectionManager:
     def __init__(self, config: AppConfig) -> None:
         self._config = config
         self._connections: dict[str, OlvmConnection] = {}
+        # Two first calls at once must not each log in (one session would never be revoked).
+        self._lock = threading.Lock()
         _MANAGERS.add(self)
 
     @classmethod
@@ -328,12 +374,13 @@ class ConnectionManager:
             if target_name
             else self._config.default_target
         )
-        cached = self._connections.get(target.name)
-        if cached is not None:
-            return cached
-        conn = OlvmConnection(target)
-        self._connections[target.name] = conn
-        return conn
+        with self._lock:
+            cached = self._connections.get(target.name)
+            if cached is not None:
+                return cached
+            conn = OlvmConnection(target)
+            self._connections[target.name] = conn
+            return conn
 
     def disconnect(self, target_name: str) -> None:
         conn = self._connections.pop(target_name, None)

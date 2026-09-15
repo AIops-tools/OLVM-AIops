@@ -95,12 +95,16 @@ def host_get(host_id: str = typer.Argument(..., help="Host id (see 'host list').
 
 @host_app.command("health")
 @cli_errors
-def host_health(events_limit: int = typer.Option(200, "--events-limit",
+def host_health(events_window_hours: int = typer.Option(
+            24, "--events-window-hours", min=1, max=720,
+            help="Ignore events older than this many hours."),
+        events_limit: int = typer.Option(200, "--events-limit",
                                                  help="Recent warning+ events to correlate."),
                 as_json: bool = JsonOption, target: TargetOption = None) -> None:
     """What needs attention on hosts, worst first."""
     conn, _ = get_connection(target)
-    out = diagnose.host_health_rca(conn, events_limit=events_limit)
+    out = diagnose.host_health_rca(conn, events_limit=events_limit,
+                                   events_window_hours=events_window_hours)
     if as_json:
         console.print_json(json.dumps(out))
         return

@@ -12,6 +12,13 @@ from olvm_aiops.ops import diagnose as dg
 
 pytestmark = pytest.mark.unit
 
+
+@pytest.fixture(autouse=True)
+def _fixed_now(monkeypatch):
+    """The fixtures' events are from 2026-09-15 02:xx UTC. Pin "now" so a 24 h event
+    window does not turn these tests into a time bomb that fails a day later."""
+    monkeypatch.setattr(dg.time, "time", lambda: 1789441200)
+
 FIX = pathlib.Path(__file__).parent / "fixtures"
 
 
@@ -91,3 +98,45 @@ def test_the_event_query_is_the_severity_form_that_works_live():
     dg.host_health_rca(conn, events_limit=50)
     params = [c.kwargs["params"] for c in conn.get.call_args_list if c.args[0] == "/events"][0]
     assert params == {"max": "51", "search": "severity>normal sortby time desc"}
+
+
+def _event(index, code, severity, host_id, minutes_ago, **refs):
+    return {"index": str(index), "code": str(code), "severity": severity,
+            "time": (1789441200 - minutes_ago * 60) * 1000,
+            "description": f"event {code}", "host": {"id": host_id}, **refs}
+
+
+def test_host_events_outside_the_window_are_history_not_findings():
+    host = _host("up", id="h1", name="kvm-a")
+    events = {"event": [_event(1, 5000, "error", "h1", minutes_ago=60 * 30)]}
+    out = dg.host_health_rca(_conn({"host": [host]}, events))
+    assert out["findings"] == [] and out["eventsOutsideWindow"] == 1 and out["healthy"] is True
+
+
+def test_events_about_a_vm_or_storage_domain_are_not_blamed_on_the_executing_host():
+    """Live: 'Storage Domain lab-nfs-data was attached…' carries the host that ran it."""
+    host = _host("up", id="h1", name="kvm-a")
+    events = {"event": [
+        _event(1, 996, "error", "h1", 5, storage_domain={"id": "sd1"}),
+        _event(2, 119, "error", "h1", 5, vm={"id": "vm1"})]}
+    assert dg.host_health_rca(_conn({"host": [host]}, events))["findings"] == []
+
+
+def test_repeated_host_events_collapse_into_one_finding():
+    host = _host("up", id="h1", name="kvm-a")
+    events = {"event": [_event(i, 7000, "warning", "h1", i) for i in range(1, 6)]}
+    [f] = dg.host_health_rca(_conn({"host": [host]}, events))["findings"]
+    assert "×5 in window" in f["signal"] and f["severity"] == "medium"
+
+
+@pytest.mark.parametrize(("external", "severity"), [("error", "high"), ("warning", "medium")])
+def test_host_external_status_is_a_finding(external, severity):
+    hosts = {"host": [_host("up", external_status=external)]}
+    [f] = dg.host_health_rca(_conn(hosts, {}))["findings"]
+    assert f["severity"] == severity and f["signal"] == f"external_status={external}"
+
+
+@pytest.mark.parametrize("hours", [0, 721, True])
+def test_events_window_is_bounded(hours):
+    with pytest.raises(ValueError, match="events_window_hours"):
+        dg.host_health_rca(_conn({}, {}), events_window_hours=hours)

@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.AIops-tools/olvm-aiops",
   "title": "OLVM AIops",
-  "description": "Governed OLVM / oVirt ops: inventory, health, capacity, diagnosis; audited.",
+  "description": "Governed OLVM / oVirt 4.5 ops — 16 MCP tools: inventory, health, capacity, diagnosis; audited.",
   "repository": {
     "url": "https://github.com/AIops-tools/OLVM-AIops",
     "source": "github"

@@ -107,7 +107,8 @@ def job_list(limit: int = 100, status: Optional[str] = None,
 @mcp.tool()
 @governed_tool(risk_level="low")
 @tool_errors("dict")
-def host_health_rca(events_limit: int = 200, target: Optional[str] = None) -> dict:
+def host_health_rca(events_limit: int = 200, events_window_hours: int = 24,
+                    target: Optional[str] = None) -> dict:
     """[READ] What needs attention on KVM hosts, ranked worst first, in one call.
 
     Combines host status and status detail, reinstall/update flags and recent
@@ -119,6 +120,9 @@ def host_health_rca(events_limit: int = 200, target: Optional[str] = None) -> di
 
     Args:
         events_limit: Recent warning-or-worse events to correlate, 1-1000 (default 200).
+        events_window_hours: Ignore events older than this many hours, 1-720 (default 24);
+            older ones are counted in eventsOutsideWindow.
         target: Engine target name from config; omit to use the default.
     """
-    return diagnose.host_health_rca(_get_connection(target), events_limit=events_limit)
+    return diagnose.host_health_rca(_get_connection(target), events_limit=events_limit,
+                                    events_window_hours=events_window_hours)

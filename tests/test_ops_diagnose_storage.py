@@ -14,6 +14,13 @@ from olvm_aiops.ops.storage import GIB
 
 pytestmark = pytest.mark.unit
 
+
+@pytest.fixture(autouse=True)
+def _fixed_now(monkeypatch):
+    """The fixtures' events are from 2026-09-15 02:xx UTC. Pin "now" so a 24 h event
+    window does not turn these tests into a time bomb that fails a day later."""
+    monkeypatch.setattr(dg.time, "time", lambda: 1789441200)
+
 RUN = pathlib.Path(__file__).parent / "fixtures" / "olvm-4.5.5-running"
 
 
@@ -31,7 +38,7 @@ def _conn(mutate_global=None, mutate_dc=None) -> MagicMock:
         mutate_dc(dcv["storage_domain"][0])
     routes = {"/storagedomains": glob, f"/datacenters/{dc_id}/storagedomains": dcv}
     conn = MagicMock()
-    conn.get.side_effect = lambda path, params=None: copy.deepcopy(routes.get(path, {}))
+    conn.get.side_effect = lambda path, params=None: copy.deepcopy(routes[path])
     return conn
 
 
@@ -61,11 +68,20 @@ def test_below_the_low_space_warning_but_above_the_blocker_is_medium():
     assert f["severity"] == "medium" and "free 8.0% < low-space warning 10%" in f["signal"]
 
 
-def test_overcommit_beyond_capacity_is_medium():
+def test_overcommit_alone_is_low_because_thin_provisioning_is_normal():
     def over(sd):
         sd["committed"] = str(120 * GIB)
-    f = _only(dg.storage_capacity_rca(_conn(mutate_global=over)))
-    assert f["severity"] == "medium" and "committed" in f["signal"]
+    out = dg.storage_capacity_rca(_conn(mutate_global=over))
+    f = _only(out)
+    assert f["severity"] == "low" and "committed" in f["signal"]
+    assert out["healthy"] is True
+
+
+def test_overcommit_with_low_space_is_medium():
+    def over_and_low(sd):
+        sd["available"], sd["used"], sd["committed"] = str(40 * GIB), str(460 * GIB), str(600 * GIB)
+    out = dg.storage_capacity_rca(_conn(mutate_global=over_and_low))
+    assert sorted(f["severity"] for f in out["findings"]) == ["medium", "medium"]
 
 
 @pytest.mark.parametrize(("status", "severity"), [
@@ -90,3 +106,4 @@ def test_findings_rank_worst_first():
         sd["available"], sd["used"], sd["committed"] = str(2 * GIB), str(98 * GIB), str(150 * GIB)
     out = dg.storage_capacity_rca(_conn(mutate_global=bad))
     assert [(f["rank"], f["severity"]) for f in out["findings"]] == [(1, "critical"), (2, "medium")]
+    assert "critical blocker" in out["findings"][0]["signal"]

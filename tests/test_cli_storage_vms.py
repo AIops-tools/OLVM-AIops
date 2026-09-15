@@ -31,7 +31,7 @@ def wired(monkeypatch):
               "/vms": {"vm": [vm]}, f"/vms/{vm['id']}/statistics": run("vm_statistics"),
               "/events": {}}
     conn = MagicMock()
-    conn.get.side_effect = lambda path, params=None: routes.get(path, {})
+    conn.get.side_effect = lambda path, params=None: routes[path]
     monkeypatch.setattr("olvm_aiops.cli.storage_vms.get_connection",
                         lambda target=None: (conn, None))
     return vm
@@ -62,3 +62,12 @@ def test_vm_list_json(wired):
     r = runner.invoke(app, ["vm", "list", "--json"])
     assert r.exit_code == 0, r.output
     assert json.loads(r.stdout)["vms"][0]["status"] == "up"
+
+
+@pytest.fixture(autouse=True)
+def _fixed_now(monkeypatch):
+    """Fixture events are from 2026-09-15 02:xx UTC. Pin "now" so the 24 h event window
+    does not turn these tests into a time bomb that fails a day later."""
+    import olvm_aiops.ops.diagnose as dg
+
+    monkeypatch.setattr(dg.time, "time", lambda: 1789441200)  # 2026-09-15T03:00:00Z

@@ -22,7 +22,7 @@ def load(case: str, name: str) -> dict:
 
 def _wire(monkeypatch, routes: dict) -> MagicMock:
     conn = MagicMock()
-    conn.get.side_effect = lambda path, params=None: routes.get(path, {})
+    conn.get.side_effect = lambda path, params=None: routes[path]
     for mod in ("olvm_aiops.cli.inventory", "olvm_aiops.cli.activity"):
         monkeypatch.setattr(f"{mod}.get_connection", lambda target=None: (conn, None))
     return conn
@@ -71,3 +71,12 @@ def test_datacenter_and_cluster_lists(monkeypatch):
                         "/clusters": load("olvm-4.5.5-installing", "clusters")})
     assert "uninitialized" in runner.invoke(app, ["datacenter", "list"]).stdout
     assert "4.7" in runner.invoke(app, ["cluster", "list"]).stdout
+
+
+@pytest.fixture(autouse=True)
+def _fixed_now(monkeypatch):
+    """Fixture events are from 2026-09-15 02:xx UTC. Pin "now" so the 24 h event window
+    does not turn these tests into a time bomb that fails a day later."""
+    import olvm_aiops.ops.diagnose as dg
+
+    monkeypatch.setattr(dg.time, "time", lambda: 1789441200)  # 2026-09-15T03:00:00Z

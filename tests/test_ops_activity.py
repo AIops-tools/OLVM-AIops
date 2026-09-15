@@ -50,9 +50,6 @@ def test_severity_threshold_uses_the_search_form_that_works_live():
     act.list_events(conn, limit=10, min_severity="warning")
     assert conn.get.call_args.kwargs["params"] == {
         "max": "11", "search": "severity>normal sortby time desc"}
-    act.list_events(conn, limit=10, min_severity="alert", page=3)
-    params = conn.get.call_args.kwargs["params"]
-    assert params["search"] == "severity>error sortby time desc page 3"
 
 
 def test_normal_threshold_sends_no_severity_clause():
@@ -119,12 +116,23 @@ def test_since_minutes_filters_on_event_time_and_never_sends_a_time_search(monke
     assert out["scanTruncated"] is False and out["sinceMinutes"] == 5
 
 
-def test_since_minutes_reports_a_cut_scan(monkeypatch):
+def test_since_minutes_reports_a_cut_scan_whose_oldest_event_is_inside_the_window(monkeypatch):
     monkeypatch.setattr(act.u, "ANALYSIS_LIST_LIMIT", 3)
     monkeypatch.setattr(act.time, "time", lambda: 2_000_000_000.0)
     events = [{"index": str(i), "time": 2_000_000_000_000} for i in range(5)]
     out = act.list_events(_conn({"event": events}), limit=50, since_minutes=10)
     assert out["returned"] == 3 and out["scanTruncated"] is True
+
+
+def test_a_cut_scan_that_already_reaches_past_the_window_is_not_partial(monkeypatch):
+    """Review finding: on a busy engine since_minutes=5 always said PARTIAL."""
+    monkeypatch.setattr(act.u, "ANALYSIS_LIST_LIMIT", 3)
+    now_ms = 2_000_000_000_000
+    monkeypatch.setattr(act.time, "time", lambda: now_ms / 1000)
+    events = [{"index": str(i), "time": now_ms - i * 10 * 60_000} for i in range(5)]
+    out = act.list_events(_conn({"event": events}), limit=50, since_minutes=15)
+    assert [r["index"] for r in out["events"]] == [0, 1]
+    assert out["scanTruncated"] is False
 
 
 def test_jobs_come_back_newest_first_although_the_engine_sends_oldest_first():
@@ -137,3 +145,41 @@ def test_jobs_come_back_newest_first_although_the_engine_sends_oldest_first():
     assert got == sorted(got, reverse=True)
     newest = max(running["job"], key=lambda j: int(j["start_time"]))
     assert out["jobs"][0]["id"] == newest["id"]
+
+
+class PagingEngine:
+    """Pages events exactly like the live engine: page size == max."""
+
+    def __init__(self, n: int):
+        self.events = [{"index": str(i), "time": 1_789_440_000_000 - i, "severity": "normal",
+                        "code": "1"} for i in range(n, 0, -1)]
+        self.calls: list[dict] = []
+
+    def get(self, path, params=None):
+        self.calls.append(dict(params))
+        size = int(params["max"])
+        search = params.get("search", "")
+        page = int(search.rsplit("page ", 1)[1]) if "page " in search else 1
+        start = (page - 1) * size
+        return {"event": self.events[start:start + size]}
+
+
+def test_paging_through_events_skips_nothing_at_page_boundaries():
+    """Live: page 1 (max=5) showed 170..167 and page 2 (max=5) 165..162 — 166 was never shown."""
+    engine = PagingEngine(12)
+    seen, page = [], 1
+    while True:
+        out = act.list_events(engine, limit=4, page=page)
+        seen += [r["index"] for r in out["events"]]
+        if not out["truncated"]:
+            break
+        page += 1
+    assert seen == list(range(12, 0, -1)), "every event exactly once, in order"
+    assert page == 3
+
+
+def test_last_page_is_not_truncated_and_a_short_page_needs_no_probe():
+    engine = PagingEngine(10)
+    out = act.list_events(engine, limit=4, page=3)
+    assert [r["index"] for r in out["events"]] == [2, 1] and out["truncated"] is False
+    assert len(engine.calls) == 1

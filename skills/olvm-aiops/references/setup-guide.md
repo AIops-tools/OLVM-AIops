@@ -2,86 +2,93 @@
 
 ## Prerequisites
 
-- A **Xen Orchestra instance** (XO from sources or the Xen Orchestra
-  Appliance, 5.x) with the REST API at `/rest/v0`. XO is the management plane
-  this tool talks to; your XCP-ng hosts/pools must already be connected to it
-  (XO UI → Settings → Servers). **Per-host XAPI access is out of scope.**
-- Python ≥ 3.11 (`uv tool install olvm-aiops` handles the rest).
+- An Oracle Linux Virtualization Manager 4.5 or oVirt 4.5 engine, reachable over HTTPS.
+- Python 3.11+ with [uv](https://docs.astral.sh/uv/) (`uv tool install olvm-aiops`), or `uvx`
+  for the MCP server.
+- An engine account. For read-only use, a user holding a read-only role such as
+  `ReadOnlyAdmin` on the system or data center is enough, and keeps any change refused by the
+  engine itself.
 
-## 1. Create an XO authentication token
+## 1. Know your username form
 
-In the XO UI: user menu (top-right) → **Personal tokens** → create. Or from a
-shell: `xo-cli --createToken`. Use a dedicated XO user with the least
-privilege you can (admin is required for some collections; a read-mostly user
-works for triage-only setups).
+The username includes its authorization profile:
 
-## 2. Onboard
+| Engine | Admin username |
+|---|---|
+| Keycloak enabled by engine-setup (the default since 4.5.1) | `admin@ovirt@internalsso` |
+| Keycloak disabled, or an engine upgraded from before 4.5.1 | `admin@internal` |
+| Directory users | `user@<profile>` as shown on the Administration Portal login page |
+
+A wrong profile answers "Cannot authenticate user" from the engine's SSO service.
+
+## 2. Get the engine CA
+
+```bash
+curl -o olvm-engine-ca.pem \
+  'https://<engine-fqdn>/ovirt-engine/services/pki-resource?resource=ca-certificate&format=X509-PEM-CA'
+```
+
+Connect by the engine's FQDN. Its certificate is issued to that name; connecting by IP fails
+verification with "IP address mismatch", which this tool reports as a TLS problem, not as an
+unreachable engine.
+
+## 3. Onboard
 
 ```bash
 olvm-aiops init
 ```
 
-The wizard prompts for:
+The wizard asks for a master password (encrypts `secrets.enc`), then per target: name, engine
+URL, username, CA file, whether to verify TLS, and the account password (hidden). It writes:
 
-1. **Master password** — encrypts `~/.olvm-aiops/secrets.enc`. Never stored;
-   export `OLVM_AIOPS_MASTER_PASSWORD` for non-interactive use.
-2. **Target name** (e.g. `xo1`) and the **XO URL** (e.g.
-   `https://xo.example.com` — the same origin as the XO web UI).
-3. **TLS verification** — default **yes**; answer no only for self-signed lab
-   certificates.
-4. **The token** (hidden input) — stored encrypted, never in config.yaml.
+```yaml
+targets:
+  - name: engine1
+    url: https://olvm-engine.example.com
+    username: admin@ovirt@internalsso
+    ca_file: /etc/pki/olvm-engine-ca.pem
+    verify_ssl: true
+```
 
-## 3. Verify
+Optional per target: `timeout` (seconds per request, default 30).
+
+## 4. Verify
 
 ```bash
 olvm-aiops doctor
 ```
 
-Checks: config present, encrypted store present + permissions (600), token
-present per target, XO reachable, token valid (a 401/403 fails the check), and
-how many XCP-ng pools the XO instance manages.
+Expect the engine product and version, e.g. "Connected to 'engine1' (…) as
+admin@ovirt@internalsso — Oracle Linux Virtualization Manager 4.5.5-1.73.el9".
 
 ## Files & permissions
 
 | Path | Content | Mode |
-|------|---------|:----:|
-| `~/.olvm-aiops/config.yaml` | non-secret connection details | 700 dir |
-| `~/.olvm-aiops/secrets.enc` | Fernet-encrypted token map | 600 |
-| `~/.olvm-aiops/audit.db` | SQLite audit log (every tool call) | — |
-| `~/.olvm-aiops/undo.db` | recorded inverse descriptors | — |
+|---|---|---|
+| `~/.olvm-aiops/config.yaml` | Non-secret connection details | 600 recommended |
+| `~/.olvm-aiops/secrets.enc` | Encrypted passwords (Fernet + scrypt) | 600 (doctor warns otherwise) |
+| `~/.olvm-aiops/audit.db` | Audit log of every call | user-only |
+| `~/.olvm-aiops/undo.db` | Undo log (unused in this read-only release) | user-only |
 
 Relocate everything with `OLVM_AIOPS_HOME`.
 
 ## Security notes
 
-- The token is sent per request as `Authorization: Bearer <token>` **and**
-  `Cookie: authenticationToken=<token>` (compatibility across XO 5.x
-  releases); held in memory only, never logged.
-- Secret encryption: Fernet (AES-128-CBC + HMAC-SHA256), key derived from the
-  master password via scrypt (N=2^15, r=8, p=1) with a random per-store salt.
-- High-risk writes (`snapshot_delete`, `snapshot_revert`) require a `dry_run`
-  preview + double confirmation at the CLI, and carry a `high` risk tier as a
-  descriptive audit label — it gates nothing. `OLVM_AUDIT_APPROVED_BY` /
-  `OLVM_AUDIT_RATIONALE` are optional annotations recorded on the audit row,
-  never required.
-- Budget guard: `OLVM_MAX_TOOL_CALLS` (default ceiling on calls per process)
-  and `OLVM_MAX_TOOL_SECONDS` (cumulative wall-time), plus a runaway breaker
-  for tight poll loops.
-- No outbound traffic except the configured XO endpoint. No telemetry.
+- The password is exchanged once per connection for an SSO token held only in memory; the token
+  is revoked (`/ovirt-engine/services/sso-logout`) when the connection closes. The engine issues
+  no refresh token, so an expired token is renewed by logging in again, once, on a 401.
+- Neither the password nor the token is logged. SSO session ids that the engine prints in its
+  login events are redacted before event text is returned.
+- `verify_ssl: false` disables certificate checks entirely; use it only on a throwaway lab engine.
+- The tool makes no outbound calls other than to the configured engine URL.
+- This release has no write tools. Least privilege is still set on the engine account, which is
+  the boundary that will keep holding once writes are added.
 
 ## MCP client setup
 
-```json
-{
-  "mcpServers": {
-    "olvm-aiops": {
-      "command": "uvx",
-      "args": ["--from", "olvm-aiops", "olvm-aiops-mcp"],
-      "env": { "OLVM_AIOPS_MASTER_PASSWORD": "your-master-password" }
-    }
-  }
-}
+```bash
+uvx --from olvm-aiops olvm-aiops-mcp
 ```
 
-MCP clients do **not** inherit your shell environment — the master password
-(and any `OLVM_*` overrides) must be in the `env` block.
+Put `OLVM_AIOPS_MASTER_PASSWORD` (and `OLVM_AIOPS_HOME` / `OLVM_AIOPS_CONFIG` if used) in the
+client's `env` block: MCP clients do not inherit your shell profile.

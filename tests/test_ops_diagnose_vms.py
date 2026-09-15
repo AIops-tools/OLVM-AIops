@@ -13,6 +13,13 @@ from olvm_aiops.ops import diagnose as dg
 
 pytestmark = pytest.mark.unit
 
+
+@pytest.fixture(autouse=True)
+def _fixed_now(monkeypatch):
+    """The fixtures' events are from 2026-09-15 02:xx UTC. Pin "now" so a 24 h event
+    window does not turn these tests into a time bomb that fails a day later."""
+    monkeypatch.setattr(dg.time, "time", lambda: 1789441200)
+
 RUN = pathlib.Path(__file__).parent / "fixtures" / "olvm-4.5.5-running"
 LIVE_VM = json.loads((RUN / "vm_after.json").read_text())
 
@@ -20,7 +27,7 @@ LIVE_VM = json.loads((RUN / "vm_after.json").read_text())
 def _conn(*vms: dict, events: dict | None = None) -> MagicMock:
     routes = {"/vms": {"vm": list(vms)}, "/events": events or {}}
     conn = MagicMock()
-    conn.get.side_effect = lambda path, params=None: copy.deepcopy(routes.get(path, {}))
+    conn.get.side_effect = lambda path, params=None: copy.deepcopy(routes[path])
     return conn
 
 
@@ -94,3 +101,22 @@ def test_an_error_event_after_the_current_start_still_counts():
                          "description": "VM lab-vm1 is down with error.", "vm": {"id": vm["id"]}}]}
     [f] = dg.vm_health_rca(_conn(vm, events=events))["findings"]
     assert f["severity"] == "high"
+
+
+def test_a_failed_start_is_superseded_once_the_vm_started_even_if_it_is_down_again():
+    """Review finding: a VM that failed to start, then started and was shut down normally,
+    stayed high because only an 'up' VM could supersede the event."""
+    vm = _vm(status="down", stop_time=1789440000000)          # started 1789439400722, stopped later
+    events = {"event": [{"index": "154", "time": 1789439295422, "severity": "error", "code": "54",
+                         "description": "Failed to run VM lab-vm1", "vm": {"id": vm["id"]}}]}
+    [f] = dg.vm_health_rca(_conn(vm, events=events))["findings"]
+    assert f["severity"] == "info" and "Superseded" in f["cause"]
+
+
+def test_vm_events_outside_the_window_are_ignored():
+    vm = _vm(status="down")
+    vm.pop("start_time", None)
+    events = {"event": [{"index": "1", "time": (1789441200 - 3 * 86400) * 1000, "severity": "error",
+                         "code": "119", "description": "old", "vm": {"id": vm["id"]}}]}
+    out = dg.vm_health_rca(_conn(vm, events=events))
+    assert out["findings"] == [] and out["eventsOutsideWindow"] == 1

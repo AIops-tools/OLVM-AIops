@@ -30,7 +30,7 @@ def _routes(extra: dict | None = None) -> MagicMock:
     conn = MagicMock()
 
     def get(path, params=None):
-        value = routes.get(path, {})
+        value = routes[path]
         if isinstance(value, Exception):
             raise value
         return value
@@ -83,5 +83,10 @@ def test_get_storage_domain_joins_the_data_center_view():
     conn = _routes({f"/storagedomains/{single['id']}": single})
     row = st.get_storage_domain(conn, single["id"])
     assert row["status"] == "active" and row["name"] == "lab-nfs-data"
+    # An empty 200 body parses to {} — say so rather than return an all-null row.
     with pytest.raises(ValueError, match="no storage domain"):
-        st.get_storage_domain(_routes(), "missing")
+        st.get_storage_domain(_routes({"/storagedomains/missing": {}}), "missing")
+    # A real engine answers an unknown id with 404; that error reaches the caller unchanged.
+    gone = _routes({"/storagedomains/gone": OlvmApiError("Not found (404)", status_code=404)})
+    with pytest.raises(OlvmApiError, match="404"):
+        st.get_storage_domain(gone, "gone")

@@ -96,26 +96,44 @@ def list_events(conn: Any, limit: int = u.DEFAULT_LIST_LIMIT, min_severity: str 
     if since_minutes is not None and page > 1:
         raise ValueError("since_minutes cannot be combined with page; narrow the window instead.")
     limit = u.bounded_limit(limit)
-    clauses = [c for c in (_severity_search(min_severity), "sortby time desc",
-                           f"page {page}" if page > 1 else None) if c]
-    params: dict[str, str] = {"search": " ".join(clauses)}
-    if after_index is not None:
-        params["from"] = str(after_index)
-    if since_minutes is None:
-        params["max"] = str(limit + 1)
-        rows = u.items(conn.get("/events", params=params), "event")
-        out = u.envelope("events", [event_row(r) for r in rows[:limit]], limit, len(rows) > limit)
-        return {**out, "minSeverity": min_severity, "page": page, "afterIndex": after_index,
-                "sinceMinutes": None, "scanTruncated": None}
-    params["max"] = str(u.ANALYSIS_LIST_LIMIT + 1)
-    scan = u.items(conn.get("/events", params=params), "event")
-    scan_truncated = len(scan) > u.ANALYSIS_LIST_LIMIT
+    base = [c for c in (_severity_search(min_severity), "sortby time desc") if c]
+    extra: dict[str, str] = {} if after_index is None else {"from": str(after_index)}
+    meta = {"minSeverity": min_severity, "page": page, "afterIndex": after_index}
+
+    if since_minutes is not None:
+        return {**_events_since(conn, base, extra, limit, since_minutes), **meta}
+    if page == 1:
+        rows = u.items(conn.get("/events", params={**extra, "search": " ".join(base),
+                                                   "max": str(limit + 1)}), "event")
+        shown, truncated = rows[:limit], len(rows) > limit
+    else:
+        # The engine's page size IS max. Asking for limit+1 on page N shifts every page by
+        # one row and hides the row at each boundary (verified live: with limit 4, event 166
+        # never appeared). So page N is fetched with max=limit, and "more" is page N+1.
+        shown = u.items(conn.get("/events", params={**extra, "max": str(limit),
+                                                    "search": " ".join(base + [f"page {page}"])}),
+                        "event")
+        truncated = False
+        if len(shown) == limit:
+            nxt = conn.get("/events", params={**extra, "max": str(limit),
+                                              "search": " ".join(base + [f"page {page + 1}"])})
+            truncated = bool(u.items(nxt, "event"))
+    out = u.envelope("events", [event_row(r) for r in shown], limit, truncated)
+    return {**out, "sinceMinutes": None, "scanTruncated": None, **meta}
+
+
+def _events_since(conn: Any, base: list[str], extra: dict, limit: int, since_minutes: int) -> dict:
+    scan = u.items(conn.get("/events", params={**extra, "search": " ".join(base),
+                                                "max": str(u.ANALYSIS_LIST_LIMIT + 1)}), "event")
+    cut = len(scan) > u.ANALYSIS_LIST_LIMIT
+    scan = scan[:u.ANALYSIS_LIST_LIMIT]
     cutoff_ms = int((time.time() - since_minutes * 60) * 1000)
-    recent = [e for e in scan[:u.ANALYSIS_LIST_LIMIT]
-              if (u.as_int(e.get("time")) or 0) >= cutoff_ms]
+    recent = [e for e in scan if (u.as_int(e.get("time")) or 0) >= cutoff_ms]
+    # A cut scan only hides events inside the window if its oldest event is still inside it.
+    oldest = u.as_int(scan[-1].get("time")) if scan else None
+    scan_truncated = cut and (oldest is None or oldest >= cutoff_ms)
     out = u.envelope("events", [event_row(r) for r in recent[:limit]], limit, len(recent) > limit)
-    return {**out, "minSeverity": min_severity, "page": 1, "afterIndex": after_index,
-            "sinceMinutes": since_minutes, "scanTruncated": scan_truncated}
+    return {**out, "sinceMinutes": since_minutes, "scanTruncated": scan_truncated}
 
 
 def job_row(j: dict) -> dict:

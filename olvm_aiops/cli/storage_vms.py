@@ -72,6 +72,11 @@ def storage_capacity(as_json: bool = JsonOption, target: TargetOption = None) ->
     console.print(f"{out['domainsEvaluated']} attached domain(s) evaluated, "
                   f"{out['domainsSkippedUnattached']} unattached skipped.")
     _print_findings(out, "storageDomain")
+    for err in out["statusErrors"]:
+        console.print(f"[yellow]Status unreadable for data center {escape(err['dataCenterId'])}: "
+                      f"{escape(err['error'])}[/]")
+    if out["domainsTruncated"]:
+        console.print("[yellow]PARTIAL: more storage domains exist than were evaluated.[/]")
 
 
 @vm_app.command("list")
@@ -109,15 +114,21 @@ def vm_stats(vm_id: str = typer.Argument(..., help="VM id."), target: TargetOpti
 
 @vm_app.command("health")
 @cli_errors
-def vm_health(events_limit: int = typer.Option(200, "--events-limit",
+def vm_health(events_window_hours: int = typer.Option(
+            24, "--events-window-hours", min=1, max=720,
+            help="Ignore events older than this many hours."),
+        events_limit: int = typer.Option(200, "--events-limit",
                                                help="Recent warning+ events to correlate."),
               as_json: bool = JsonOption, target: TargetOption = None) -> None:
     """VM problems, worst first."""
     conn, _ = get_connection(target)
-    out = diagnose.vm_health_rca(conn, events_limit=events_limit)
+    out = diagnose.vm_health_rca(conn, events_limit=events_limit,
+                                 events_window_hours=events_window_hours)
     if as_json:
         console.print_json(json.dumps(out))
         return
     counts = ", ".join(f"{k}={v}" for k, v in sorted(out["vmStatusCounts"].items())) or "none"
     console.print(f"{out['vmsEvaluated']} VM(s): {counts}")
     _print_findings(out, "vm")
+    if out["vmsTruncated"] or out["eventsTruncated"]:
+        console.print("[yellow]PARTIAL: the VM or event scan was cut short.[/]")

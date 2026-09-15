@@ -1,127 +1,64 @@
 # Agent guardrails — running olvm-aiops with a smaller / local model
 
-If you drive these tools with a local model (Llama, Qwen, Mistral … via Goose,
-Ollama, LM Studio, or any OpenAI-compatible runtime), you will get noticeably
-better results with a short system prompt. This page gives you one, and — more
-importantly — tells you which guardrails you **no longer need to write**, because
-the tool now enforces them itself.
-
-The distinction matters. A guardrail in a prompt is a request. A guardrail in the
-harness is a guarantee. Anything below that we could move into the harness, we did.
+Guardrails written into a prompt are requests; guardrails in the tool are guarantees. This page
+separates the two so a prompt only spends tokens on what the tool cannot enforce.
 
 ## Authorization is not this tool's job — decide it where it belongs
 
-Whether a write should happen is your decision, or the account's. The tool does
-not gate it — there is no read-only switch and no approval prompt to configure.
-The two right places to control read vs write:
-
-- **The Xen Orchestra account whose token you connect with.** Give that XO user
-  a read-only ACL, or scope its personal token down. A write then fails at Xen
-  Orchestra, which is the only place the permission actually lives — a revoked
-  permission cannot be argued around by a model, but a skill-side flag can.
-- **Your agent's system prompt.** If you want an observe-only session, tell the
-  model not to call the write tools (they are clearly tagged `[WRITE]`).
-
-What the tool *does* guarantee is that you can always see what happened:
+olvm-aiops does not decide what an agent may change. This release has no write tools at all,
+and when writes arrive the boundary will still be the engine account: connect a user with a
+read-only role (for example `ReadOnlyAdmin`) and the engine refuses every change regardless of
+what any model decides. Do not rely on prompt wording for this.
 
 ## What the tool enforces — do not waste prompt budget on these
 
 | You might be tempted to prompt | Why you don't need to |
 |---|---|
-| "Don't invent a value when a field is missing" | A field Xen Orchestra did not return comes back as `null`, never as `""`. A VM with no `name_label`, a task with no `properties.name`, an SR with no `content_type` — all report `null`. Absent and empty are distinguishable in the payload. |
-| "Tell me if the output was cut off" | Every listing returns `{"vms": [...], "returned": N, "limit": L, "truncated": true/false}` (same shape with `srs`, `vdis`, `snapshots`, `tasks`, `jobs`, `logs`, `undos`). Truncation is **measured** — the full collection length client-side, or one over-fetched record for `backup_log_list` — never guessed from the row count matching the limit. The RCA tools report `inputTruncated` when the listing they correlated over was itself capped. |
-| "Preserve the ordering / tell me what's most urgent" | RCA findings carry an explicit `severity` (`high`/`medium`/`low`) and are already sorted worst-first, each with the measured number in `evidence` and a concrete `action`. Priority is in the payload, not implied by list position. |
-| "Confirm before anything destructive" | Destructive operations (`snapshot_delete`, `snapshot_revert`, `vm_stop`/`reboot`/`migrate`) require a `dry_run` preview + double confirmation at the CLI. Reversible writes capture the prior state so the undo token can restore it. |
-| "Never stop the Xen Orchestra VM itself" | **Only if the operator declared it.** Set `xo_self_vm_uuid` on the target and `vm_stop` refuses exactly that uuid on both the MCP and CLI paths. Undeclared, nothing is refused — XO exposes no self endpoint and its token carries no claims, so the tool cannot work this out and fails open rather than guess. Keep a prompt line for this if you cannot declare the uuid. |
-| "Log what you did" | Every governed call is audited to `~/.olvm-aiops/audit.db` regardless of what the model says it did — and the CLI writes the same row the MCP path does, so there is no unaudited entry point. |
-| "Don't get stuck retrying" | The runaway guard trips a circuit breaker if the same call is hammered in a tight loop — a stuck agent is stopped rather than left to burn calls and time. |
+| "Don't invent a value when a field is missing" | A value the engine did not report comes back as `null`, never as `0`, `false` or `""`. |
+| "Numbers from the API are strings, convert them" | Counts, sizes and flags are converted to real integers and booleans; times to ISO-8601 UTC. |
+| "Tell me if the output was cut off" | Every limited listing returns `returned`, `limit` and a measured `truncated`; scans report `scanTruncated` / `hostsTruncated` / `vmsTruncated` / `eventsTruncated`. |
+| "Start with the worst problem" | Diagnoses return findings with an explicit `rank` (1 = worst). |
+| "Explain why something was flagged" | Every finding carries the measured `signal`, a `cause` and an `action`. |
+| "Don't treat a host being installed/rebooted as broken" | In-progress host states are `info` findings; alert 9000 (no fencing hardware) is `low`. |
+| "An old failed start doesn't mean the VM is broken now" | A VM error event older than the VM's latest start is superseded (`info`), even if the VM is down again; events older than `events_window_hours` (default 24) are not findings. |
+| "Don't blame the host for a storage or VM problem" | An event that names a VM or storage domain is not attributed to the host that ran it; repeats of one code on one host are one finding with a count. |
+| "A login page is not an empty inventory" | A non-JSON success response is an error, never an empty list. |
+| "Storage status: check the data center, not the global list" | Storage status is joined from each data center; `statusSource` says where it came from. |
+| "Don't leak credentials" | Passwords are encrypted at rest, tokens stay in memory, SSO session ids in events are redacted. |
+| "Log what you did" | Every call — MCP and CLI — writes an audit row to `~/.olvm-aiops/audit.db`. |
+| "Don't loop on the same call" | The runaway guard trips a circuit breaker on tight repetition. |
 
 ## What still needs a prompt
 
-These are model-behaviour problems the harness cannot fix from the outside.
-Copy this into your agent's system prompt:
-
-```text
-You operate an XCP-ng environment through the olvm-aiops MCP tools. They talk
-to Xen Orchestra's REST API; there is no direct per-host XAPI access.
-
-TOOL USE
-- Before answering any question about the current XCP-ng environment, you MUST
-  call a tool. Never answer from memory or assumption.
-- Actually invoke the tool. Do not describe the call you would make, and do not
-  emit an example JSON response in place of calling it.
-- Start broad triage with "overview" — it fans out over pools, hosts, VMs, SRs
-  and recent backup runs in one call.
-- If a tool call fails, report the real error verbatim. Never fill the gap with
-  a plausible-sounding answer.
-
-READING RESULTS
-- Listings come back as an envelope, not a bare list: read the items under
-  "vms" / "srs" / "vdis" / "snapshots" / "tasks" / "jobs" / "logs".
-- If "truncated" is true, say so and re-run with a higher limit instead of
-  treating the partial result as complete. If an RCA reports "inputTruncated",
-  its conclusion covers only a subset — state that.
-- A null field means Xen Orchestra did not return that value. Report it as "not
-  available" — never infer it.
-- Report values exactly as returned. Do not normalise, translate, or prettify
-  power states, SR types, statuses, or uuids.
-- When an RCA result has findings, work in the order given (worst first) and
-  cite the measured number in each finding's "evidence".
-
-IDENTIFIERS
-- Every object is addressed by its XO uuid: a VM uuid (vm_list), a host uuid
-  (host_list), a pool uuid (pool_list), an SR uuid (sr_list), a VDI uuid
-  (vdi_list), a snapshot uuid (snapshot_list). They are NOT interchangeable —
-  do not pass a host uuid where a VM uuid is expected.
-- A name_label is a label, not an identifier: it is not unique and must never
-  be used in place of a uuid. Resolve the name to a uuid with a list tool first.
-- An XO task id (task_list) identifies an async job, not the object it acted on.
-
-SCOPE
-- Separate observation from interpretation. State what the tools returned, then
-  any interpretation, clearly marked as such.
-- Do not assert a capacity, performance, or availability problem unless a tool
-  result supports it.
-- Do not add generic advice that does not follow from the tool output.
-```
+1. **Call the diagnosis first.** For "what is wrong", call `host_health_rca`,
+   `storage_capacity_rca` and `vm_health_rca` before reading raw lists.
+2. **Report in rank order and quote the signal.** Do not paraphrase numbers.
+3. **Severity words mean what they say.** `info` and `low` are not incidents.
+4. **A `null` is unknown.** Say "not reported", never "zero" or "none".
+5. **Do not claim completeness when a scan was cut.** If any `*Truncated` is true, say the answer
+   is partial and how to widen it (`limit`, `events_limit`, `events_window_hours`, `page`).
+6. **Follow events with the cursor.** Keep the highest `index` and pass it as `after_index`.
+7. **Do not fabricate write operations.** This release cannot start, stop, migrate or snapshot;
+   say so instead of describing a result.
 
 ## Recommended setup for a local model
 
-Start with a connection that *cannot* write, verify, and widen the account's
-permission only when you trust the setup — snapshot delete/revert are
-irreversible, and stopping the wrong VM can be the one XO itself runs on:
-
-```bash
-# Give the Xen Orchestra account a read-only ACL, or scope its personal token
-# down, so writes fail at XO rather than depending on a skill-side flag. Then:
-olvm-aiops doctor
+```text
+You operate an Oracle Linux Virtualization Manager engine through olvm-aiops tools.
+For "what is wrong" questions, call host_health_rca, storage_capacity_rca and vm_health_rca
+first. Report findings in rank order; quote each finding's signal exactly. info and low are
+not incidents. A null value means the engine did not report it — say "not reported".
+If any truncated/scanTruncated/hostsTruncated/vmsTruncated/eventsTruncated field is true,
+say the answer is partial. To follow new events, pass the highest index you have seen as
+after_index. You cannot change anything in this release; never describe a change as done.
 ```
 
-Optionally annotate the audit trail with who is operating and why — recorded on
-every row, never required:
-
-```bash
-export OLVM_AUDIT_APPROVED_BY="your.name@example.com"
-export OLVM_AUDIT_RATIONALE="scheduled maintenance window 2026-07-20"
-```
+Connect the tool with a read-only engine account as well — the prompt is not the boundary.
 
 ## If your model still struggles
 
-Some behaviours are model-capacity limits rather than prompt problems:
-
-- **Multi-tool workflows time out or drift.** Prefer `overview` and the four RCA
-  tools (`vm_health_rca`, `sr_usage_rca`, `backup_failure_rca`,
-  `pool_patch_ha_posture`) — they do the multi-step correlation inside one call,
-  so the model does not have to chain reads and keep uuids straight.
-- **The model ignores later tool results in a long context.** Ask narrower
-  questions and use `limit` (plus the `pool` / `sr` / `power_state` / `status`
-  filters) deliberately rather than pulling whole inventories. `vdi_list` in
-  particular is the longest listing in a real fleet.
-- **The model describes calls instead of making them.** This is usually a
-  runtime/tool-calling-format mismatch, not a prompt problem — check that your
-  client advertises the tools in the format your model was trained on.
-
-Feedback on running this with a specific local model is genuinely useful —
-open an issue at
-[github.com/AIops-tools/OLVM-AIops](https://github.com/AIops-tools/OLVM-AIops/issues)
-with the model, runtime, and what went wrong.
+- Prefer the CLI (`olvm-aiops host health`, `storage capacity`, `vm health`): shorter output
+  than MCP JSON.
+- Lower `limit` / `events_limit` so each result fits the context window; the truncation fields
+  still say when more exists.
+- Ask one question per turn; each diagnosis already combines the reads it needs.
