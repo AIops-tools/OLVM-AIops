@@ -1,0 +1,50 @@
+{
+  "product_info": {
+    "instance_id": "6db19458-b0aa-11f1-bbd0-0050568855da",
+    "name": "Oracle Linux Virtualization Manager",
+    "version": {
+      "build": "5",
+      "full_version": "4.5.5-1.73.el9",
+      "major": "4",
+      "minor": "5",
+      "revision": "0"
+    }
+  },
+  "special_objects": {
+    "blank_template": {
+      "href": "/ovirt-engine/api/templates/00000000-0000-0000-0000-000000000000",
+      "id": "00000000-0000-0000-0000-000000000000"
+    },
+    "root_tag": {
+      "href": "/ovirt-engine/api/tags/00000000-0000-0000-0000-000000000000",
+      "id": "00000000-0000-0000-0000-000000000000"
+    }
+  },
+  "summary": {
+    "hosts": {
+      "active": "1",
+      "total": "1"
+    },
+    "storage_domains": {
+      "active": "1",
+      "total": "2"
+    },
+    "users": {
+      "active": "2",
+      "total": "2"
+    },
+    "vms": {
+      "active": "0",
+      "total": "1"
+    }
+  },
+  "time": 1789439295701,
+  "authenticated_user": {
+    "href": "/ovirt-engine/api/users/6a84476b-a1c8-4773-961f-8d54d72ed231",
+    "id": "6a84476b-a1c8-4773-961f-8d54d72ed231"
+  },
+  "effective_user": {
+    "href": "/ovirt-engine/api/users/6a84476b-a1c8-4773-961f-8d54d72ed231",
+    "id": "6a84476b-a1c8-4773-961f-8d54d72ed231"
+  }
+}

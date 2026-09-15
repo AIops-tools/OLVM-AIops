@@ -1,0 +1,10 @@
+{
+  "status": 409,
+  "body": {
+    "fault": {
+      "detail": "[Cannot run VM: The following disks are locked: lab-vm1-disk. Please try again in a few minutes.]",
+      "reason": "Operation Failed"
+    },
+    "status": "failed"
+  }
+}

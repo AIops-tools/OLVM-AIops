@@ -1,0 +1,38 @@
+{
+  "network": [
+    {
+      "mtu": "0",
+      "port_isolation": "false",
+      "stp": "false",
+      "usages": {
+        "usage": [
+          "vm"
+        ]
+      },
+      "vdsm_name": "ovirtmgmt",
+      "data_center": {
+        "href": "/ovirt-engine/api/datacenters/6c7314ae-b0aa-11f1-a47a-0050568855da",
+        "id": "6c7314ae-b0aa-11f1-a47a-0050568855da"
+      },
+      "name": "ovirtmgmt",
+      "description": "Management Network",
+      "comment": "",
+      "link": [
+        {
+          "href": "/ovirt-engine/api/networks/00000000-0000-0000-0000-000000000009/permissions",
+          "rel": "permissions"
+        },
+        {
+          "href": "/ovirt-engine/api/networks/00000000-0000-0000-0000-000000000009/vnicprofiles",
+          "rel": "vnicprofiles"
+        },
+        {
+          "href": "/ovirt-engine/api/networks/00000000-0000-0000-0000-000000000009/networklabels",
+          "rel": "networklabels"
+        }
+      ],
+      "href": "/ovirt-engine/api/networks/00000000-0000-0000-0000-000000000009",
+      "id": "00000000-0000-0000-0000-000000000009"
+    }
+  ]
+}

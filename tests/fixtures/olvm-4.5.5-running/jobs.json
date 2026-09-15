@@ -1,0 +1,169 @@
+{
+  "job": [
+    {
+      "auto_cleared": "true",
+      "end_time": 1789439222802,
+      "external": "false",
+      "last_updated": 1789439222802,
+      "start_time": 1789438302074,
+      "status": "finished",
+      "owner": {
+        "href": "/ovirt-engine/api/users/6a84476b-a1c8-4773-961f-8d54d72ed231",
+        "id": "6a84476b-a1c8-4773-961f-8d54d72ed231"
+      },
+      "actions": {
+        "link": [
+          {
+            "href": "/ovirt-engine/api/jobs/b29ed401-30d3-458c-80cf-cc9df050ae96/clear",
+            "rel": "clear"
+          },
+          {
+            "href": "/ovirt-engine/api/jobs/b29ed401-30d3-458c-80cf-cc9df050ae96/end",
+            "rel": "end"
+          }
+        ]
+      },
+      "description": "Adding new Host olvm-kvm1 to Cluster Default",
+      "link": [
+        {
+          "href": "/ovirt-engine/api/jobs/b29ed401-30d3-458c-80cf-cc9df050ae96/steps",
+          "rel": "steps"
+        }
+      ],
+      "href": "/ovirt-engine/api/jobs/b29ed401-30d3-458c-80cf-cc9df050ae96",
+      "id": "b29ed401-30d3-458c-80cf-cc9df050ae96"
+    },
+    {
+      "auto_cleared": "true",
+      "end_time": 1789439222790,
+      "external": "false",
+      "last_updated": 1789439222790,
+      "start_time": 1789438622533,
+      "status": "finished",
+      "owner": {
+        "href": "/ovirt-engine/api/users/00000000-0000-0000-0000-000000000000",
+        "id": "00000000-0000-0000-0000-000000000000"
+      },
+      "actions": {
+        "link": [
+          {
+            "href": "/ovirt-engine/api/jobs/57bedcc4-2f7b-4367-b57a-95f88b142969/clear",
+            "rel": "clear"
+          },
+          {
+            "href": "/ovirt-engine/api/jobs/57bedcc4-2f7b-4367-b57a-95f88b142969/end",
+            "rel": "end"
+          }
+        ]
+      },
+      "description": "SshHostReboot",
+      "link": [
+        {
+          "href": "/ovirt-engine/api/jobs/57bedcc4-2f7b-4367-b57a-95f88b142969/steps",
+          "rel": "steps"
+        }
+      ],
+      "href": "/ovirt-engine/api/jobs/57bedcc4-2f7b-4367-b57a-95f88b142969",
+      "id": "57bedcc4-2f7b-4367-b57a-95f88b142969"
+    },
+    {
+      "auto_cleared": "true",
+      "end_time": 1789439228125,
+      "external": "false",
+      "last_updated": 1789439228125,
+      "start_time": 1789439227971,
+      "status": "finished",
+      "owner": {
+        "href": "/ovirt-engine/api/users/00000000-0000-0000-0000-000000000000",
+        "id": "00000000-0000-0000-0000-000000000000"
+      },
+      "actions": {
+        "link": [
+          {
+            "href": "/ovirt-engine/api/jobs/75914dd1-3c96-47be-87e4-4c6b34a025a9/clear",
+            "rel": "clear"
+          },
+          {
+            "href": "/ovirt-engine/api/jobs/75914dd1-3c96-47be-87e4-4c6b34a025a9/end",
+            "rel": "end"
+          }
+        ]
+      },
+      "description": "Activating Host olvm-kvm1",
+      "link": [
+        {
+          "href": "/ovirt-engine/api/jobs/75914dd1-3c96-47be-87e4-4c6b34a025a9/steps",
+          "rel": "steps"
+        }
+      ],
+      "href": "/ovirt-engine/api/jobs/75914dd1-3c96-47be-87e4-4c6b34a025a9",
+      "id": "75914dd1-3c96-47be-87e4-4c6b34a025a9"
+    },
+    {
+      "auto_cleared": "true",
+      "end_time": 1789439235104,
+      "external": "false",
+      "last_updated": 1789439235104,
+      "start_time": 1789439234904,
+      "status": "finished",
+      "owner": {
+        "href": "/ovirt-engine/api/users/6a84476b-a1c8-4773-961f-8d54d72ed231",
+        "id": "6a84476b-a1c8-4773-961f-8d54d72ed231"
+      },
+      "actions": {
+        "link": [
+          {
+            "href": "/ovirt-engine/api/jobs/28aee0fd-5293-4455-9be1-2c114116dd03/clear",
+            "rel": "clear"
+          },
+          {
+            "href": "/ovirt-engine/api/jobs/28aee0fd-5293-4455-9be1-2c114116dd03/end",
+            "rel": "end"
+          }
+        ]
+      },
+      "description": "Connecting Host olvm-kvm1 to Storage server",
+      "link": [
+        {
+          "href": "/ovirt-engine/api/jobs/28aee0fd-5293-4455-9be1-2c114116dd03/steps",
+          "rel": "steps"
+        }
+      ],
+      "href": "/ovirt-engine/api/jobs/28aee0fd-5293-4455-9be1-2c114116dd03",
+      "id": "28aee0fd-5293-4455-9be1-2c114116dd03"
+    },
+    {
+      "auto_cleared": "true",
+      "end_time": 1789439239727,
+      "external": "false",
+      "last_updated": 1789439239727,
+      "start_time": 1789439237328,
+      "status": "finished",
+      "owner": {
+        "href": "/ovirt-engine/api/users/6a84476b-a1c8-4773-961f-8d54d72ed231",
+        "id": "6a84476b-a1c8-4773-961f-8d54d72ed231"
+      },
+      "actions": {
+        "link": [
+          {
+            "href": "/ovirt-engine/api/jobs/b1fac536-3f97-4e0b-b292-5aefc6aff4bf/clear",
+            "rel": "clear"
+          },
+          {
+            "href": "/ovirt-engine/api/jobs/b1fac536-3f97-4e0b-b292-5aefc6aff4bf/end",
+            "rel": "end"
+          }
+        ]
+      },
+      "description": "Adding NFS Storage Domain lab-nfs-data to Data Center <UNKNOWN>",
+      "link": [
+        {
+          "href": "/ovirt-engine/api/jobs/b1fac536-3f97-4e0b-b292-5aefc6aff4bf/steps",
+          "rel": "steps"
+        }
+      ],
+      "href": "/ovirt-engine/api/jobs/b1fac536-3f97-4e0b-b292-5aefc6aff4bf",
+      "id": "b1fac536-3f97-4e0b-b292-5aefc6aff4bf"
+    }
+  ]
+}

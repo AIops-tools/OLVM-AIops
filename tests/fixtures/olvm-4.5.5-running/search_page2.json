@@ -1,0 +1,118 @@
+{
+  "event": [
+    {
+      "code": "34",
+      "correlation_id": "8d7ae14a-545d-4639-8a8d-ad9423255603",
+      "custom_id": "-1",
+      "flood_rate": "0",
+      "index": "157",
+      "origin": "oVirt",
+      "severity": "normal",
+      "time": 1789439294740,
+      "cluster": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da",
+        "id": "6c75512e-b0aa-11f1-a105-0050568855da"
+      },
+      "data_center": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/datacenters/6c7314ae-b0aa-11f1-a47a-0050568855da",
+        "id": "6c7314ae-b0aa-11f1-a47a-0050568855da"
+      },
+      "storage_domain": {
+        "name": "lab-nfs-data",
+        "href": "/ovirt-engine/api/storagedomains/63cbf24f-3a4a-4ae4-a3aa-ec4e388edf8a",
+        "id": "63cbf24f-3a4a-4ae4-a3aa-ec4e388edf8a"
+      },
+      "template": {
+        "name": "Blank",
+        "href": "/ovirt-engine/api/templates/00000000-0000-0000-0000-000000000000",
+        "id": "00000000-0000-0000-0000-000000000000"
+      },
+      "user": {
+        "name": "admin@ovirt@internalkeycloak-authz",
+        "href": "/ovirt-engine/api/users/6a84476b-a1c8-4773-961f-8d54d72ed231",
+        "id": "6a84476b-a1c8-4773-961f-8d54d72ed231"
+      },
+      "vm": {
+        "name": "lab-vm1",
+        "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04",
+        "id": "cb377fa6-a678-4311-88f3-27851e396f04"
+      },
+      "description": "VM lab-vm1 was created by admin@ovirt@internalkeycloak-authz.",
+      "href": "/ovirt-engine/api/events/157",
+      "id": "157"
+    },
+    {
+      "code": "962",
+      "correlation_id": "30f80c62-c236-4d59-9159-0b0d024e537a",
+      "custom_id": "-1",
+      "flood_rate": "0",
+      "index": "156",
+      "origin": "oVirt",
+      "severity": "normal",
+      "time": 1789439294313,
+      "cluster": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da",
+        "id": "6c75512e-b0aa-11f1-a105-0050568855da"
+      },
+      "data_center": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/datacenters/6c7314ae-b0aa-11f1-a47a-0050568855da",
+        "id": "6c7314ae-b0aa-11f1-a47a-0050568855da"
+      },
+      "host": {
+        "name": "olvm-kvm1",
+        "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a",
+        "id": "4bba6d9b-668b-4092-b4c2-ab2833b3f68a"
+      },
+      "storage_domain": {
+        "name": "lab-nfs-data",
+        "href": "/ovirt-engine/api/storagedomains/63cbf24f-3a4a-4ae4-a3aa-ec4e388edf8a",
+        "id": "63cbf24f-3a4a-4ae4-a3aa-ec4e388edf8a"
+      },
+      "user": {
+        "name": "admin@ovirt@internalkeycloak-authz",
+        "href": "/ovirt-engine/api/users/6a84476b-a1c8-4773-961f-8d54d72ed231",
+        "id": "6a84476b-a1c8-4773-961f-8d54d72ed231"
+      },
+      "description": "Storage Domain lab-nfs-data was attached to Data Center Default by admin@ovirt@internalkeycloak-authz",
+      "href": "/ovirt-engine/api/events/156",
+      "id": "156"
+    },
+    {
+      "code": "1002",
+      "correlation_id": "7d33c53e",
+      "custom_id": "-1",
+      "flood_rate": "0",
+      "index": "155",
+      "origin": "oVirt",
+      "severity": "normal",
+      "time": 1789439294308,
+      "cluster": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da",
+        "id": "6c75512e-b0aa-11f1-a105-0050568855da"
+      },
+      "data_center": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/datacenters/6c7314ae-b0aa-11f1-a47a-0050568855da",
+        "id": "6c7314ae-b0aa-11f1-a47a-0050568855da"
+      },
+      "host": {
+        "name": "olvm-kvm1",
+        "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a",
+        "id": "4bba6d9b-668b-4092-b4c2-ab2833b3f68a"
+      },
+      "user": {
+        "name": "admin@ovirt@internalkeycloak-authz",
+        "href": "/ovirt-engine/api/users/6a84476b-a1c8-4773-961f-8d54d72ed231",
+        "id": "6a84476b-a1c8-4773-961f-8d54d72ed231"
+      },
+      "description": "Storage Domains were attached to Data Center Default by admin@ovirt@internalkeycloak-authz",
+      "href": "/ovirt-engine/api/events/155",
+      "id": "155"
+    }
+  ]
+}

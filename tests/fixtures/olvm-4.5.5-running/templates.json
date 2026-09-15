@@ -1,0 +1,150 @@
+{
+  "template": [
+    {
+      "status": "ok",
+      "version": {
+        "version_name": "",
+        "version_number": "0",
+        "base_template": {
+          "href": "/ovirt-engine/api/templates/00000000-0000-0000-0000-000000000000",
+          "id": "00000000-0000-0000-0000-000000000000"
+        }
+      },
+      "actions": {
+        "link": [
+          {
+            "href": "/ovirt-engine/api/templates/00000000-0000-0000-0000-000000000000/export",
+            "rel": "export"
+          }
+        ]
+      },
+      "name": "Blank",
+      "description": "Blank template",
+      "comment": "",
+      "bios": {
+        "boot_menu": {
+          "enabled": "false"
+        }
+      },
+      "cpu": {
+        "architecture": "undefined",
+        "topology": {
+          "cores": "1",
+          "sockets": "1",
+          "threads": "1"
+        }
+      },
+      "display": {
+        "allow_override": "false",
+        "copy_paste_enabled": "true",
+        "disconnect_action": "LOCK_SCREEN",
+        "disconnect_action_delay": "0",
+        "file_transfer_enabled": "true",
+        "monitors": "1",
+        "smartcard_enabled": "false",
+        "type": "vnc"
+      },
+      "io": {
+        "threads": "1"
+      },
+      "memory": "1073741824",
+      "migration": {
+        "auto_converge": "inherit",
+        "compressed": "inherit",
+        "encrypted": "inherit",
+        "parallel_migrations_policy": "inherit"
+      },
+      "origin": "ovirt",
+      "os": {
+        "boot": {
+          "devices": {
+            "device": [
+              "hd"
+            ]
+          }
+        },
+        "type": "other"
+      },
+      "sso": {
+        "methods": {
+          "method": [
+            {
+              "id": "guest_agent"
+            }
+          ]
+        }
+      },
+      "stateless": "false",
+      "type": "server",
+      "usb": {
+        "enabled": "false"
+      },
+      "link": [
+        {
+          "href": "/ovirt-engine/api/templates/00000000-0000-0000-0000-000000000000/diskattachments",
+          "rel": "diskattachments"
+        },
+        {
+          "href": "/ovirt-engine/api/templates/00000000-0000-0000-0000-000000000000/graphicsconsoles",
+          "rel": "graphicsconsoles"
+        },
+        {
+          "href": "/ovirt-engine/api/templates/00000000-0000-0000-0000-000000000000/permissions",
+          "rel": "permissions"
+        },
+        {
+          "href": "/ovirt-engine/api/templates/00000000-0000-0000-0000-000000000000/tags",
+          "rel": "tags"
+        },
+        {
+          "href": "/ovirt-engine/api/templates/00000000-0000-0000-0000-000000000000/cdroms",
+          "rel": "cdroms"
+        },
+        {
+          "href": "/ovirt-engine/api/templates/00000000-0000-0000-0000-000000000000/nics",
+          "rel": "nics"
+        },
+        {
+          "href": "/ovirt-engine/api/templates/00000000-0000-0000-0000-000000000000/watchdogs",
+          "rel": "watchdogs"
+        },
+        {
+          "href": "/ovirt-engine/api/templates/00000000-0000-0000-0000-000000000000/mediateddevices",
+          "rel": "mediateddevices"
+        }
+      ],
+      "href": "/ovirt-engine/api/templates/00000000-0000-0000-0000-000000000000",
+      "id": "00000000-0000-0000-0000-000000000000",
+      "auto_pinning_policy": "disabled",
+      "cpu_pinning_policy": "none",
+      "cpu_shares": "0",
+      "creation_time": 1206997200000,
+      "delete_protected": "false",
+      "high_availability": {
+        "enabled": "false",
+        "priority": "0"
+      },
+      "large_icon": {
+        "href": "/ovirt-engine/api/icons/bf6e3b05-2905-4842-b7e3-5e7b26cc34f4",
+        "id": "bf6e3b05-2905-4842-b7e3-5e7b26cc34f4"
+      },
+      "memory_policy": {
+        "ballooning": "true",
+        "guaranteed": "1073741824",
+        "max": "4294967296"
+      },
+      "migration_downtime": "-1",
+      "multi_queues_enabled": "true",
+      "placement_policy": {
+        "affinity": "migratable"
+      },
+      "small_icon": {
+        "href": "/ovirt-engine/api/icons/92f703c7-91cc-4d2a-a491-e5f09af1b6fc",
+        "id": "92f703c7-91cc-4d2a-a491-e5f09af1b6fc"
+      },
+      "start_paused": "false",
+      "storage_error_resume_behaviour": "auto_resume",
+      "virtio_scsi_multi_queues_enabled": "false"
+    }
+  ]
+}

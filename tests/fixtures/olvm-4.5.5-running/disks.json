@@ -1,0 +1,86 @@
+{
+  "disk": [
+    {
+      "actual_size": "0",
+      "alias": "lab-vm1-disk",
+      "backup": "none",
+      "content_type": "data",
+      "format": "cow",
+      "image_id": "3c0fa667-b509-4278-b2d9-18b4112c2e99",
+      "propagate_errors": "false",
+      "provisioned_size": "1073741824",
+      "shareable": "false",
+      "sparse": "true",
+      "status": "locked",
+      "storage_type": "image",
+      "total_size": "0",
+      "wipe_after_delete": "false",
+      "disk_profile": {
+        "href": "/ovirt-engine/api/diskprofiles/6344b4ba-781c-4f43-8973-0a55afa77669",
+        "id": "6344b4ba-781c-4f43-8973-0a55afa77669"
+      },
+      "quota": {
+        "href": "/ovirt-engine/api/datacenters/6c7314ae-b0aa-11f1-a47a-0050568855da/quotas/6ee0a1fc-b0aa-11f1-b5de-0050568855da",
+        "id": "6ee0a1fc-b0aa-11f1-b5de-0050568855da"
+      },
+      "storage_domains": {
+        "storage_domain": [
+          {
+            "href": "/ovirt-engine/api/storagedomains/63cbf24f-3a4a-4ae4-a3aa-ec4e388edf8a",
+            "id": "63cbf24f-3a4a-4ae4-a3aa-ec4e388edf8a"
+          }
+        ]
+      },
+      "actions": {
+        "link": [
+          {
+            "href": "/ovirt-engine/api/disks/658d8816-c335-4266-9f61-81312dfff25b/sparsify",
+            "rel": "sparsify"
+          },
+          {
+            "href": "/ovirt-engine/api/disks/658d8816-c335-4266-9f61-81312dfff25b/move",
+            "rel": "move"
+          },
+          {
+            "href": "/ovirt-engine/api/disks/658d8816-c335-4266-9f61-81312dfff25b/refreshlun",
+            "rel": "refreshlun"
+          },
+          {
+            "href": "/ovirt-engine/api/disks/658d8816-c335-4266-9f61-81312dfff25b/convert",
+            "rel": "convert"
+          },
+          {
+            "href": "/ovirt-engine/api/disks/658d8816-c335-4266-9f61-81312dfff25b/copy",
+            "rel": "copy"
+          },
+          {
+            "href": "/ovirt-engine/api/disks/658d8816-c335-4266-9f61-81312dfff25b/export",
+            "rel": "export"
+          },
+          {
+            "href": "/ovirt-engine/api/disks/658d8816-c335-4266-9f61-81312dfff25b/reduce",
+            "rel": "reduce"
+          }
+        ]
+      },
+      "name": "lab-vm1-disk",
+      "description": "",
+      "link": [
+        {
+          "href": "/ovirt-engine/api/disks/658d8816-c335-4266-9f61-81312dfff25b/permissions",
+          "rel": "permissions"
+        },
+        {
+          "href": "/ovirt-engine/api/disks/658d8816-c335-4266-9f61-81312dfff25b/disksnapshots",
+          "rel": "disksnapshots"
+        },
+        {
+          "href": "/ovirt-engine/api/disks/658d8816-c335-4266-9f61-81312dfff25b/statistics",
+          "rel": "statistics"
+        }
+      ],
+      "href": "/ovirt-engine/api/disks/658d8816-c335-4266-9f61-81312dfff25b",
+      "id": "658d8816-c335-4266-9f61-81312dfff25b"
+    }
+  ]
+}

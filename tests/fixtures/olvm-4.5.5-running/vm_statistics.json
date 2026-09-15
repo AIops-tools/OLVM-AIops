@@ -1,0 +1,321 @@
+{
+  "statistic": [
+    {
+      "kind": "gauge",
+      "type": "integer",
+      "unit": "bytes",
+      "values": {
+        "value": [
+          {
+            "datum": 268435456
+          }
+        ]
+      },
+      "vm": {
+        "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04",
+        "id": "cb377fa6-a678-4311-88f3-27851e396f04"
+      },
+      "name": "memory.installed",
+      "description": "Total memory configured",
+      "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04/statistics/5a89a1d2-32be-33f7-a0d1-f8b5bc974ff6",
+      "id": "5a89a1d2-32be-33f7-a0d1-f8b5bc974ff6"
+    },
+    {
+      "kind": "gauge",
+      "type": "integer",
+      "unit": "bytes",
+      "values": {
+        "value": [
+          {
+            "datum": 0
+          }
+        ]
+      },
+      "vm": {
+        "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04",
+        "id": "cb377fa6-a678-4311-88f3-27851e396f04"
+      },
+      "name": "memory.used",
+      "description": "Memory used (agent)",
+      "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04/statistics/b7499508-c1c3-32f0-8174-c1783e57bb08",
+      "id": "b7499508-c1c3-32f0-8174-c1783e57bb08"
+    },
+    {
+      "kind": "gauge",
+      "type": "decimal",
+      "unit": "percent",
+      "values": {
+        "value": [
+          {
+            "datum": 0
+          }
+        ]
+      },
+      "vm": {
+        "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04",
+        "id": "cb377fa6-a678-4311-88f3-27851e396f04"
+      },
+      "name": "cpu.current.guest",
+      "description": "CPU used by guest",
+      "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04/statistics/ef802239-b74a-329f-9955-be8fea6b50a4",
+      "id": "ef802239-b74a-329f-9955-be8fea6b50a4"
+    },
+    {
+      "kind": "gauge",
+      "type": "decimal",
+      "unit": "percent",
+      "values": {
+        "value": [
+          {
+            "datum": 4.3
+          }
+        ]
+      },
+      "vm": {
+        "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04",
+        "id": "cb377fa6-a678-4311-88f3-27851e396f04"
+      },
+      "name": "cpu.current.hypervisor",
+      "description": "CPU overhead",
+      "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04/statistics/d849a55f-0049-36f8-ae65-face541473ac",
+      "id": "d849a55f-0049-36f8-ae65-face541473ac"
+    },
+    {
+      "kind": "gauge",
+      "type": "decimal",
+      "unit": "percent",
+      "values": {
+        "value": [
+          {
+            "datum": 4.3
+          }
+        ]
+      },
+      "vm": {
+        "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04",
+        "id": "cb377fa6-a678-4311-88f3-27851e396f04"
+      },
+      "name": "cpu.current.total",
+      "description": "Total CPU used",
+      "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04/statistics/2ec286fe-4bec-32f5-8d63-dba7bed58763",
+      "id": "2ec286fe-4bec-32f5-8d63-dba7bed58763"
+    },
+    {
+      "kind": "gauge",
+      "type": "decimal",
+      "unit": "percent",
+      "values": {
+        "value": [
+          {
+            "datum": 0
+          }
+        ]
+      },
+      "vm": {
+        "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04",
+        "id": "cb377fa6-a678-4311-88f3-27851e396f04"
+      },
+      "name": "migration.progress",
+      "description": "Migration Progress",
+      "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04/statistics/892b69a7-41ca-36b1-9a2e-ae5177ef21bb",
+      "id": "892b69a7-41ca-36b1-9a2e-ae5177ef21bb"
+    },
+    {
+      "kind": "gauge",
+      "type": "integer",
+      "unit": "bytes",
+      "values": {
+        "value": [
+          {
+            "datum": 0
+          }
+        ]
+      },
+      "vm": {
+        "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04",
+        "id": "cb377fa6-a678-4311-88f3-27851e396f04"
+      },
+      "name": "memory.buffered",
+      "description": "Memory buffered (agent)",
+      "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04/statistics/09e07489-64fd-32ab-8e4e-a2b61eed8d60",
+      "id": "09e07489-64fd-32ab-8e4e-a2b61eed8d60"
+    },
+    {
+      "kind": "gauge",
+      "type": "integer",
+      "unit": "bytes",
+      "values": {
+        "value": [
+          {
+            "datum": 0
+          }
+        ]
+      },
+      "vm": {
+        "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04",
+        "id": "cb377fa6-a678-4311-88f3-27851e396f04"
+      },
+      "name": "memory.cached",
+      "description": "Memory cached (agent)",
+      "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04/statistics/1b6244ee-8dbd-365d-8762-482ddc05ee11",
+      "id": "1b6244ee-8dbd-365d-8762-482ddc05ee11"
+    },
+    {
+      "kind": "gauge",
+      "type": "integer",
+      "unit": "bytes",
+      "values": {
+        "value": [
+          {
+            "datum": 0
+          }
+        ]
+      },
+      "vm": {
+        "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04",
+        "id": "cb377fa6-a678-4311-88f3-27851e396f04"
+      },
+      "name": "memory.free",
+      "description": "Memory free (agent)",
+      "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04/statistics/5a0fba9d-33d7-3cbf-addd-ba462040c946",
+      "id": "5a0fba9d-33d7-3cbf-addd-ba462040c946"
+    },
+    {
+      "kind": "gauge",
+      "type": "integer",
+      "unit": "bytes",
+      "values": {
+        "value": [
+          {
+            "datum": 0
+          }
+        ]
+      },
+      "vm": {
+        "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04",
+        "id": "cb377fa6-a678-4311-88f3-27851e396f04"
+      },
+      "name": "memory.unused",
+      "description": "Memory unused (agent)",
+      "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04/statistics/439422cf-02ca-307f-9745-2a86e87ed8e0",
+      "id": "439422cf-02ca-307f-9745-2a86e87ed8e0"
+    },
+    {
+      "kind": "gauge",
+      "type": "decimal",
+      "unit": "percent",
+      "values": {
+        "value": [
+          {
+            "datum": 0
+          }
+        ]
+      },
+      "vm": {
+        "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04",
+        "id": "cb377fa6-a678-4311-88f3-27851e396f04"
+      },
+      "name": "network.current.total",
+      "description": "Total network used",
+      "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04/statistics/d5e709a1-f0bc-3bb9-9f14-1c9cdec65c40",
+      "id": "d5e709a1-f0bc-3bb9-9f14-1c9cdec65c40"
+    },
+    {
+      "kind": "gauge",
+      "type": "string",
+      "unit": "none",
+      "values": {},
+      "vm": {
+        "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04",
+        "id": "cb377fa6-a678-4311-88f3-27851e396f04"
+      },
+      "name": "disks.usage",
+      "description": "Disk usage, in bytes, per filesystem as JSON (agent)",
+      "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04/statistics/c5dd0086-d5f0-3abf-9628-4674abb3f5ac",
+      "id": "c5dd0086-d5f0-3abf-9628-4674abb3f5ac"
+    },
+    {
+      "kind": "counter",
+      "type": "integer",
+      "unit": "seconds",
+      "values": {
+        "value": [
+          {
+            "datum": 72
+          }
+        ]
+      },
+      "vm": {
+        "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04",
+        "id": "cb377fa6-a678-4311-88f3-27851e396f04"
+      },
+      "name": "elapsed.time",
+      "description": "Elapsed VM runtime",
+      "href": "/ovirt-engine/api/vms/cb377fa6-a678-4311-88f3-27851e396f04/statistics/57dfc947-ba36-3a51-a1ad-3800b6199ff5",
+      "id": "57dfc947-ba36-3a51-a1ad-3800b6199ff5"
+    },
+    {
+      "kind": "gauge",
+      "type": "decimal",
+      "unit": "percent",
+      "values": {
+        "value": [
+          {
+            "datum": 4
+          },
+          {
+            "datum": 4
+          },
+          {
+            "datum": 4
+          },
+          {
+            "datum": 0
+          },
+          {
+            "datum": 0
+          }
+        ]
+      },
+      "name": "cpu.usage.history",
+      "description": "List of CPU usage history, sorted by date from newest to oldest, at intervals of 30 seconds",
+      "id": "bde6d1ed-e07b-3aa1-bfc4-463990f5921a"
+    },
+    {
+      "kind": "gauge",
+      "type": "decimal",
+      "unit": "percent",
+      "values": {
+        "value": [
+          {
+            "datum": 0
+          },
+          {
+            "datum": 0
+          },
+          {
+            "datum": 0
+          },
+          {
+            "datum": 0
+          },
+          {
+            "datum": 0
+          }
+        ]
+      },
+      "name": "memory.usage.history",
+      "description": "List of memory usage history, sorted by date from newest to oldest, at intervals of 30 seconds",
+      "id": "e9ecc8dd-9320-37cf-ab1a-0003016f69e1"
+    },
+    {
+      "kind": "gauge",
+      "type": "decimal",
+      "unit": "percent",
+      "values": {},
+      "name": "network.usage.history",
+      "description": "List of network usage history, sorted by date from newest to oldest, at intervals of 30 seconds",
+      "id": "dddb4e54-50dc-3e49-93d7-58c7ee51274b"
+    }
+  ]
+}
