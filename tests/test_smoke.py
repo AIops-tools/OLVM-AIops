@@ -14,7 +14,11 @@ import importlib
 import pytest
 from typer.testing import CliRunner
 
-EXPECTED_TOOLS = {"undo_list", "undo_apply"}
+EXPECTED_TOOLS = {
+    "undo_list", "undo_apply",
+    "datacenter_list", "cluster_list", "host_list", "host_get",
+    "event_list", "job_list", "host_health_rca",
+}
 
 
 @pytest.mark.unit
@@ -36,6 +40,10 @@ def test_all_modules_import():
         "mcp_server.server",
         "mcp_server._shared",
         "mcp_server.tools.undo",
+        "mcp_server.tools.reads",
+        "olvm_aiops.ops.inventory",
+        "olvm_aiops.ops.activity",
+        "olvm_aiops.ops.diagnose",
     ):
         importlib.import_module(name)
 

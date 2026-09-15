@@ -18,6 +18,7 @@ from mcp_server._shared import _safe_error, mcp, tool_errors
 # Importing the tool modules registers every @mcp.tool() onto the shared
 # `mcp` instance. Order does not matter; each module is self-contained.
 from mcp_server.tools import (  # noqa: F401 — side effects
+    reads,
     undo,
 )
 
