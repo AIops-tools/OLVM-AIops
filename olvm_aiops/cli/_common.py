@@ -31,10 +31,10 @@ def _cli_error_types() -> tuple[type[BaseException], ...]:
     teaching text (e.g. which budget was hit) — without them here such a refusal
     reaches the CLI as a traceback instead.
     """
-    from olvm_aiops.connection import XoApiError
+    from olvm_aiops.connection import OlvmApiError
     from olvm_aiops.governance import BudgetExceeded, PolicyDenied
 
-    return (XoApiError, PolicyDenied, BudgetExceeded, KeyError, OSError, ValueError)
+    return (OlvmApiError, PolicyDenied, BudgetExceeded, KeyError, OSError, ValueError)
 
 
 def cli_errors(fn: Callable) -> Callable:

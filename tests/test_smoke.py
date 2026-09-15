@@ -37,6 +37,8 @@ def test_all_modules_import():
         "olvm_aiops.cli.secret",
         "olvm_aiops.cli.doctor",
         "olvm_aiops.cli.undo",
+        "olvm_aiops.cli.inventory",
+        "olvm_aiops.cli.activity",
         "mcp_server.server",
         "mcp_server._shared",
         "mcp_server.tools.undo",
@@ -67,7 +69,8 @@ def test_cli_app_builds_and_help_works():
 
     result = CliRunner().invoke(app, ["--help"])
     assert result.exit_code == 0
-    for sub in ("secret", "init", "doctor", "undo", "mcp"):
+    for sub in ("secret", "init", "doctor", "undo", "mcp",
+                "datacenter", "cluster", "host", "event", "job"):
         assert sub in result.output
 
 
@@ -80,6 +83,10 @@ def test_cli_leaf_help_triggers_lazy_imports():
         ["secret", "--help"], ["secret", "list", "--help"], ["secret", "set", "--help"],
         ["undo", "--help"], ["undo", "list", "--help"], ["undo", "apply", "--help"],
         ["doctor", "--help"], ["init", "--help"],
+        ["datacenter", "list", "--help"], ["cluster", "list", "--help"],
+        ["host", "list", "--help"], ["host", "get", "--help"],
+        ["host", "health", "--help"], ["event", "list", "--help"],
+        ["job", "list", "--help"],
     ):
         result = runner.invoke(app, cmd)
         assert result.exit_code == 0, f"{cmd} failed: {result.output}"

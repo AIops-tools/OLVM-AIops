@@ -5,8 +5,10 @@ from __future__ import annotations
 import typer
 
 from olvm_aiops.cli._common import cli_errors
+from olvm_aiops.cli.activity import event_app, job_app
 from olvm_aiops.cli.doctor import doctor_cmd
 from olvm_aiops.cli.init import init_cmd
+from olvm_aiops.cli.inventory import cluster_app, datacenter_app, host_app
 from olvm_aiops.cli.secret import secret_app
 from olvm_aiops.cli.undo import undo_app
 
@@ -16,6 +18,11 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
+app.add_typer(datacenter_app, name="datacenter")
+app.add_typer(cluster_app, name="cluster")
+app.add_typer(host_app, name="host")
+app.add_typer(event_app, name="event")
+app.add_typer(job_app, name="job")
 app.add_typer(secret_app, name="secret")
 app.add_typer(undo_app, name="undo")
 app.command("init")(init_cmd)
