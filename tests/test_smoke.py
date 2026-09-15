@@ -18,6 +18,8 @@ EXPECTED_TOOLS = {
     "undo_list", "undo_apply",
     "datacenter_list", "cluster_list", "host_list", "host_get",
     "event_list", "job_list", "host_health_rca",
+    "storage_domain_list", "storage_domain_get", "vm_list", "vm_get", "vm_stats",
+    "storage_capacity_rca", "vm_health_rca",
 }
 
 
@@ -39,10 +41,14 @@ def test_all_modules_import():
         "olvm_aiops.cli.undo",
         "olvm_aiops.cli.inventory",
         "olvm_aiops.cli.activity",
+        "olvm_aiops.cli.storage_vms",
         "mcp_server.server",
         "mcp_server._shared",
         "mcp_server.tools.undo",
         "mcp_server.tools.reads",
+        "mcp_server.tools.storage_vms",
+        "olvm_aiops.ops.storage",
+        "olvm_aiops.ops.vms",
         "olvm_aiops.ops.inventory",
         "olvm_aiops.ops.activity",
         "olvm_aiops.ops.diagnose",
@@ -70,7 +76,7 @@ def test_cli_app_builds_and_help_works():
     result = CliRunner().invoke(app, ["--help"])
     assert result.exit_code == 0
     for sub in ("secret", "init", "doctor", "undo", "mcp",
-                "datacenter", "cluster", "host", "event", "job"):
+                "datacenter", "cluster", "host", "event", "job", "storage", "vm"):
         assert sub in result.output
 
 
@@ -87,6 +93,10 @@ def test_cli_leaf_help_triggers_lazy_imports():
         ["host", "list", "--help"], ["host", "get", "--help"],
         ["host", "health", "--help"], ["event", "list", "--help"],
         ["job", "list", "--help"],
+        ["storage", "list", "--help"], ["storage", "get", "--help"],
+        ["storage", "capacity", "--help"], ["vm", "list", "--help"],
+        ["vm", "get", "--help"], ["vm", "stats", "--help"],
+        ["vm", "health", "--help"],
     ):
         result = runner.invoke(app, cmd)
         assert result.exit_code == 0, f"{cmd} failed: {result.output}"

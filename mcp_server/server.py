@@ -19,6 +19,7 @@ from mcp_server._shared import _safe_error, mcp, tool_errors
 # `mcp` instance. Order does not matter; each module is self-contained.
 from mcp_server.tools import (  # noqa: F401 — side effects
     reads,
+    storage_vms,
     undo,
 )
 

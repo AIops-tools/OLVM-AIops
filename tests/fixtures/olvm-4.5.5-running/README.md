@@ -23,3 +23,8 @@ Notable, verified shapes:
 - `vm_statistics.json`, `vm_after.json`: the VM once `up`.
 - `follow.json`: `GET /clusters?follow=hosts` answered **HTTP 500** on this engine.
 - `jobs.json`: jobs arrive **oldest first**.
+- `datacenter_storagedomains.json` / `datacenter_storagedomain_get.json`: the data-center
+  scoped view — the attached NFS domain is `active`, `master: "true"`, committed 1 GiB.
+- `storagedomains_global.json` / `storagedomain_get.json`: the same domain globally, with
+  **no status field at all**; the unattached Glance domain keeps `status: "unattached"`.
+- `storagedomain_disks.json`: the domain's disks (`lab-vm1-disk`, `ok`).

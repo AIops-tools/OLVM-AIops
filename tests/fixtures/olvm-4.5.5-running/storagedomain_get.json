@@ -1,0 +1,85 @@
+{
+  "available": "48318382080",
+  "backup": "false",
+  "block_size": "512",
+  "committed": "1073741824",
+  "critical_space_action_blocker": "5",
+  "discard_after_delete": "false",
+  "external_status": "ok",
+  "master": "true",
+  "storage": {
+    "address": "olvm-engine.lab.local",
+    "path": "/exports/data",
+    "type": "nfs"
+  },
+  "storage_format": "v5",
+  "supports_discard": "false",
+  "supports_discard_zeroes_data": "false",
+  "type": "data",
+  "used": "7516192768",
+  "warning_low_space_indicator": "10",
+  "wipe_after_delete": "false",
+  "data_centers": {
+    "data_center": [
+      {
+        "href": "/ovirt-engine/api/datacenters/6c7314ae-b0aa-11f1-a47a-0050568855da",
+        "id": "6c7314ae-b0aa-11f1-a47a-0050568855da"
+      }
+    ]
+  },
+  "actions": {
+    "link": [
+      {
+        "href": "/ovirt-engine/api/storagedomains/63cbf24f-3a4a-4ae4-a3aa-ec4e388edf8a/refreshluns",
+        "rel": "refreshluns"
+      },
+      {
+        "href": "/ovirt-engine/api/storagedomains/63cbf24f-3a4a-4ae4-a3aa-ec4e388edf8a/reduceluns",
+        "rel": "reduceluns"
+      },
+      {
+        "href": "/ovirt-engine/api/storagedomains/63cbf24f-3a4a-4ae4-a3aa-ec4e388edf8a/isattached",
+        "rel": "isattached"
+      },
+      {
+        "href": "/ovirt-engine/api/storagedomains/63cbf24f-3a4a-4ae4-a3aa-ec4e388edf8a/updateovfstore",
+        "rel": "updateovfstore"
+      }
+    ]
+  },
+  "name": "lab-nfs-data",
+  "description": "",
+  "comment": "",
+  "link": [
+    {
+      "href": "/ovirt-engine/api/storagedomains/63cbf24f-3a4a-4ae4-a3aa-ec4e388edf8a/storageconnections",
+      "rel": "storageconnections"
+    },
+    {
+      "href": "/ovirt-engine/api/storagedomains/63cbf24f-3a4a-4ae4-a3aa-ec4e388edf8a/permissions",
+      "rel": "permissions"
+    },
+    {
+      "href": "/ovirt-engine/api/storagedomains/63cbf24f-3a4a-4ae4-a3aa-ec4e388edf8a/templates",
+      "rel": "templates"
+    },
+    {
+      "href": "/ovirt-engine/api/storagedomains/63cbf24f-3a4a-4ae4-a3aa-ec4e388edf8a/vms",
+      "rel": "vms"
+    },
+    {
+      "href": "/ovirt-engine/api/storagedomains/63cbf24f-3a4a-4ae4-a3aa-ec4e388edf8a/disks",
+      "rel": "disks"
+    },
+    {
+      "href": "/ovirt-engine/api/storagedomains/63cbf24f-3a4a-4ae4-a3aa-ec4e388edf8a/diskprofiles",
+      "rel": "diskprofiles"
+    },
+    {
+      "href": "/ovirt-engine/api/storagedomains/63cbf24f-3a4a-4ae4-a3aa-ec4e388edf8a/disksnapshots",
+      "rel": "disksnapshots"
+    }
+  ],
+  "href": "/ovirt-engine/api/storagedomains/63cbf24f-3a4a-4ae4-a3aa-ec4e388edf8a",
+  "id": "63cbf24f-3a4a-4ae4-a3aa-ec4e388edf8a"
+}
