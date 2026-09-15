@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "olvm-aiops"
 version = "0.1.0"
-description = "XCP-ng AI-powered operations via Xen Orchestra with a built-in governance harness (audit, budget, undo, risk tiers)"
+description = "Governed OLVM / oVirt 4.5 operations — inventory, health, capacity and diagnosis with audit and undo."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
@@ -56,5 +56,5 @@ select = ["E", "F", "I", "N", "W", "UP"]
 testpaths = ["tests"]
 markers = [
     "unit: Unit tests",
-    "integration: Integration tests (require a Xen Orchestra instance)",
+    "integration: Integration tests (require a live OLVM / oVirt engine)",
 ]

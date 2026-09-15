@@ -1,7 +1,7 @@
 {
   "id": "olvm-aiops",
-  "name": "XCP-ng AIops",
-  "description": "Governed XCP-ng ops via Xen Orchestra — 29 MCP tools with audit, budget, undo guards.",
+  "name": "OLVM AIops",
+  "description": "Governed OLVM / oVirt 4.5 operations — inventory, health, capacity and diagnosis with audit and undo.",
   "skills": [
     "./skills"
   ],
