@@ -1,0 +1,71 @@
+{
+  "data_center": [
+    {
+      "local": "false",
+      "quota_mode": "disabled",
+      "status": "uninitialized",
+      "supported_versions": {
+        "version": [
+          {
+            "major": "4",
+            "minor": "7"
+          }
+        ]
+      },
+      "version": {
+        "major": "4",
+        "minor": "7"
+      },
+      "mac_pool": {
+        "href": "/ovirt-engine/api/macpools/58ca604b-017d-0374-0220-00000000014e",
+        "id": "58ca604b-017d-0374-0220-00000000014e"
+      },
+      "actions": {
+        "link": [
+          {
+            "href": "/ovirt-engine/api/datacenters/6c7314ae-b0aa-11f1-a47a-0050568855da/setmaster",
+            "rel": "setmaster"
+          },
+          {
+            "href": "/ovirt-engine/api/datacenters/6c7314ae-b0aa-11f1-a47a-0050568855da/cleanfinishedtasks",
+            "rel": "cleanfinishedtasks"
+          }
+        ]
+      },
+      "name": "Default",
+      "description": "The default Data Center",
+      "link": [
+        {
+          "href": "/ovirt-engine/api/datacenters/6c7314ae-b0aa-11f1-a47a-0050568855da/quotas",
+          "rel": "quotas"
+        },
+        {
+          "href": "/ovirt-engine/api/datacenters/6c7314ae-b0aa-11f1-a47a-0050568855da/qoss",
+          "rel": "qoss"
+        },
+        {
+          "href": "/ovirt-engine/api/datacenters/6c7314ae-b0aa-11f1-a47a-0050568855da/iscsibonds",
+          "rel": "iscsibonds"
+        },
+        {
+          "href": "/ovirt-engine/api/datacenters/6c7314ae-b0aa-11f1-a47a-0050568855da/storagedomains",
+          "rel": "storagedomains"
+        },
+        {
+          "href": "/ovirt-engine/api/datacenters/6c7314ae-b0aa-11f1-a47a-0050568855da/permissions",
+          "rel": "permissions"
+        },
+        {
+          "href": "/ovirt-engine/api/datacenters/6c7314ae-b0aa-11f1-a47a-0050568855da/clusters",
+          "rel": "clusters"
+        },
+        {
+          "href": "/ovirt-engine/api/datacenters/6c7314ae-b0aa-11f1-a47a-0050568855da/networks",
+          "rel": "networks"
+        }
+      ],
+      "href": "/ovirt-engine/api/datacenters/6c7314ae-b0aa-11f1-a47a-0050568855da",
+      "id": "6c7314ae-b0aa-11f1-a47a-0050568855da"
+    }
+  ]
+}

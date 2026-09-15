@@ -1,0 +1,215 @@
+{
+  "host": [
+    {
+      "address": "olvm-kvm1.lab.local",
+      "auto_numa_status": "unknown",
+      "certificate": {
+        "organization": "lab.local",
+        "subject": "O=lab.local,CN=olvm-kvm1.lab.local"
+      },
+      "cpu": {
+        "speed": 0,
+        "topology": {}
+      },
+      "device_passthrough": {
+        "enabled": "false"
+      },
+      "external_status": "ok",
+      "hardware_information": {
+        "supported_rng_sources": {
+          "supported_rng_source": []
+        }
+      },
+      "kdump_status": "unknown",
+      "ksm": {
+        "enabled": "false"
+      },
+      "max_scheduling_memory": "0",
+      "memory": "0",
+      "numa_supported": "false",
+      "os": {
+        "custom_kernel_cmdline": ""
+      },
+      "ovn_configured": "false",
+      "port": "54321",
+      "power_management": {
+        "automatic_pm_enabled": "true",
+        "enabled": "false",
+        "kdump_detection": "true",
+        "pm_proxies": {}
+      },
+      "protocol": "stomp",
+      "reinstallation_required": "false",
+      "se_linux": {},
+      "spm": {
+        "priority": "5",
+        "status": "none"
+      },
+      "ssh": {
+        "fingerprint": "SHA256:FgfcjG7aK3PUg76FWBUB4ufSjiYTGqZ3O1uW78UsC8E",
+        "port": "22",
+        "public_key": "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBNH6eVD8nc+RwUGlzneg+k+0Ml/HKmwWJw6aI6sBxo5ls/RwJx5M5sl3sR1d342rkrmbZegTYXKOXqZeAe4BrPQ="
+      },
+      "status": "reboot",
+      "summary": {
+        "total": "0"
+      },
+      "transparent_hugepages": {
+        "enabled": "false"
+      },
+      "type": "rhel",
+      "update_available": "false",
+      "vgpu_placement": "consolidated",
+      "cluster": {
+        "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da",
+        "id": "6c75512e-b0aa-11f1-a105-0050568855da"
+      },
+      "actions": {
+        "link": [
+          {
+            "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/install",
+            "rel": "install"
+          },
+          {
+            "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/activate",
+            "rel": "activate"
+          },
+          {
+            "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/forceselectspm",
+            "rel": "forceselectspm"
+          },
+          {
+            "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/iscsidiscover",
+            "rel": "iscsidiscover"
+          },
+          {
+            "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/discoveriscsi",
+            "rel": "discoveriscsi"
+          },
+          {
+            "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/iscsilogin",
+            "rel": "iscsilogin"
+          },
+          {
+            "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/syncallnetworks",
+            "rel": "syncallnetworks"
+          },
+          {
+            "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/deactivate",
+            "rel": "deactivate"
+          },
+          {
+            "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/upgrade",
+            "rel": "upgrade"
+          },
+          {
+            "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/approve",
+            "rel": "approve"
+          },
+          {
+            "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/fence",
+            "rel": "fence"
+          },
+          {
+            "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/unregisteredstoragedomainsdiscover",
+            "rel": "unregisteredstoragedomainsdiscover"
+          },
+          {
+            "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/commitnetconfig",
+            "rel": "commitnetconfig"
+          },
+          {
+            "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/enrollcertificate",
+            "rel": "enrollcertificate"
+          },
+          {
+            "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/setupnetworks",
+            "rel": "setupnetworks"
+          },
+          {
+            "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/upgradecheck",
+            "rel": "upgradecheck"
+          },
+          {
+            "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/copyhostnetworks",
+            "rel": "copyhostnetworks"
+          },
+          {
+            "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/refresh",
+            "rel": "refresh"
+          }
+        ]
+      },
+      "name": "olvm-kvm1",
+      "comment": "",
+      "link": [
+        {
+          "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/katelloerrata",
+          "rel": "katelloerrata"
+        },
+        {
+          "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/permissions",
+          "rel": "permissions"
+        },
+        {
+          "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/tags",
+          "rel": "tags"
+        },
+        {
+          "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/affinitylabels",
+          "rel": "affinitylabels"
+        },
+        {
+          "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/nics",
+          "rel": "nics"
+        },
+        {
+          "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/numanodes",
+          "rel": "numanodes"
+        },
+        {
+          "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/fenceagents",
+          "rel": "fenceagents"
+        },
+        {
+          "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/devices",
+          "rel": "devices"
+        },
+        {
+          "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/hooks",
+          "rel": "hooks"
+        },
+        {
+          "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/storage",
+          "rel": "storage"
+        },
+        {
+          "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/networkattachments",
+          "rel": "networkattachments"
+        },
+        {
+          "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/storageconnectionextensions",
+          "rel": "storageconnectionextensions"
+        },
+        {
+          "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/unmanagednetworks",
+          "rel": "unmanagednetworks"
+        },
+        {
+          "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/externalnetworkproviderconfigurations",
+          "rel": "externalnetworkproviderconfigurations"
+        },
+        {
+          "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/cpuunits",
+          "rel": "cpuunits"
+        },
+        {
+          "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a/statistics",
+          "rel": "statistics"
+        }
+      ],
+      "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a",
+      "id": "4bba6d9b-668b-4092-b4c2-ab2833b3f68a"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "event": [
+    {
+      "code": "9000",
+      "custom_id": "-1",
+      "flood_rate": "0",
+      "index": "4",
+      "origin": "oVirt",
+      "severity": "alert",
+      "time": 1789438302881,
+      "host": {
+        "name": "olvm-kvm1",
+        "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a",
+        "id": "4bba6d9b-668b-4092-b4c2-ab2833b3f68a"
+      },
+      "description": "Failed to verify Power Management configuration for Host olvm-kvm1.",
+      "href": "/ovirt-engine/api/events/4",
+      "id": "4"
+    }
+  ]
+}

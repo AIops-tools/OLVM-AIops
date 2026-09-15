@@ -1,0 +1,68 @@
+{
+  "job": [
+    {
+      "auto_cleared": "true",
+      "external": "false",
+      "last_updated": 1789438303001,
+      "start_time": 1789438302074,
+      "status": "started",
+      "owner": {
+        "href": "/ovirt-engine/api/users/6a84476b-a1c8-4773-961f-8d54d72ed231",
+        "id": "6a84476b-a1c8-4773-961f-8d54d72ed231"
+      },
+      "actions": {
+        "link": [
+          {
+            "href": "/ovirt-engine/api/jobs/b29ed401-30d3-458c-80cf-cc9df050ae96/clear",
+            "rel": "clear"
+          },
+          {
+            "href": "/ovirt-engine/api/jobs/b29ed401-30d3-458c-80cf-cc9df050ae96/end",
+            "rel": "end"
+          }
+        ]
+      },
+      "description": "Adding new Host olvm-kvm1 to Cluster Default",
+      "link": [
+        {
+          "href": "/ovirt-engine/api/jobs/b29ed401-30d3-458c-80cf-cc9df050ae96/steps",
+          "rel": "steps"
+        }
+      ],
+      "href": "/ovirt-engine/api/jobs/b29ed401-30d3-458c-80cf-cc9df050ae96",
+      "id": "b29ed401-30d3-458c-80cf-cc9df050ae96"
+    },
+    {
+      "auto_cleared": "true",
+      "external": "false",
+      "last_updated": 1789438622540,
+      "start_time": 1789438622533,
+      "status": "started",
+      "owner": {
+        "href": "/ovirt-engine/api/users/00000000-0000-0000-0000-000000000000",
+        "id": "00000000-0000-0000-0000-000000000000"
+      },
+      "actions": {
+        "link": [
+          {
+            "href": "/ovirt-engine/api/jobs/57bedcc4-2f7b-4367-b57a-95f88b142969/clear",
+            "rel": "clear"
+          },
+          {
+            "href": "/ovirt-engine/api/jobs/57bedcc4-2f7b-4367-b57a-95f88b142969/end",
+            "rel": "end"
+          }
+        ]
+      },
+      "description": "SshHostReboot",
+      "link": [
+        {
+          "href": "/ovirt-engine/api/jobs/57bedcc4-2f7b-4367-b57a-95f88b142969/steps",
+          "rel": "steps"
+        }
+      ],
+      "href": "/ovirt-engine/api/jobs/57bedcc4-2f7b-4367-b57a-95f88b142969",
+      "id": "57bedcc4-2f7b-4367-b57a-95f88b142969"
+    }
+  ]
+}
