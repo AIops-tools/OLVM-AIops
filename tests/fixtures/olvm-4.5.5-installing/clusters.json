@@ -1,0 +1,140 @@
+{
+  "cluster": [
+    {
+      "ballooning_enabled": "true",
+      "cpu": {
+        "architecture": "undefined",
+        "type": ""
+      },
+      "error_handling": {
+        "on_error": "migrate"
+      },
+      "fencing_policy": {
+        "enabled": "true",
+        "skip_if_connectivity_broken": {
+          "enabled": "false",
+          "threshold": "50"
+        },
+        "skip_if_gluster_bricks_up": "false",
+        "skip_if_gluster_quorum_not_met": "false",
+        "skip_if_sd_active": {
+          "enabled": "false"
+        }
+      },
+      "fips_mode": "undefined",
+      "firewall_type": "firewalld",
+      "gluster_service": "false",
+      "ha_reservation": "false",
+      "ksm": {
+        "enabled": "true",
+        "merge_across_nodes": "true"
+      },
+      "log_max_memory_used_threshold": "95",
+      "log_max_memory_used_threshold_type": "percentage",
+      "memory_policy": {
+        "over_commit": {
+          "percent": "100"
+        },
+        "transparent_hugepages": {
+          "enabled": "true"
+        }
+      },
+      "migration": {
+        "auto_converge": "inherit",
+        "bandwidth": {
+          "assignment_method": "auto"
+        },
+        "compressed": "inherit",
+        "encrypted": "inherit",
+        "parallel_migrations_policy": "disabled",
+        "policy": {
+          "id": "80554327-0569-496b-bdeb-fcbbf52b827b"
+        }
+      },
+      "required_rng_sources": {
+        "required_rng_source": [
+          "urandom"
+        ]
+      },
+      "switch_type": "legacy",
+      "threads_as_cores": "false",
+      "trusted_service": "false",
+      "tunnel_migration": "false",
+      "upgrade_in_progress": "false",
+      "upgrade_percent_complete": "0",
+      "version": {
+        "major": "4",
+        "minor": "7"
+      },
+      "virt_service": "true",
+      "vnc_encryption": "false",
+      "data_center": {
+        "href": "/ovirt-engine/api/datacenters/6c7314ae-b0aa-11f1-a47a-0050568855da",
+        "id": "6c7314ae-b0aa-11f1-a47a-0050568855da"
+      },
+      "mac_pool": {
+        "href": "/ovirt-engine/api/macpools/58ca604b-017d-0374-0220-00000000014e",
+        "id": "58ca604b-017d-0374-0220-00000000014e"
+      },
+      "scheduling_policy": {
+        "href": "/ovirt-engine/api/schedulingpolicies/b4ed2332-a7ac-4d5f-9596-99a439cb2812",
+        "id": "b4ed2332-a7ac-4d5f-9596-99a439cb2812"
+      },
+      "actions": {
+        "link": [
+          {
+            "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da/resetemulatedmachine",
+            "rel": "resetemulatedmachine"
+          },
+          {
+            "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da/syncallnetworks",
+            "rel": "syncallnetworks"
+          },
+          {
+            "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da/refreshglusterhealstatus",
+            "rel": "refreshglusterhealstatus"
+          },
+          {
+            "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da/upgrade",
+            "rel": "upgrade"
+          }
+        ]
+      },
+      "name": "Default",
+      "description": "The default server cluster",
+      "comment": "",
+      "link": [
+        {
+          "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da/permissions",
+          "rel": "permissions"
+        },
+        {
+          "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da/enabledfeatures",
+          "rel": "enabledfeatures"
+        },
+        {
+          "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da/externalnetworkproviders",
+          "rel": "externalnetworkproviders"
+        },
+        {
+          "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da/affinitygroups",
+          "rel": "affinitygroups"
+        },
+        {
+          "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da/cpuprofiles",
+          "rel": "cpuprofiles"
+        },
+        {
+          "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da/networkfilters",
+          "rel": "networkfilters"
+        },
+        {
+          "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da/networks",
+          "rel": "networks"
+        }
+      ],
+      "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da",
+      "id": "6c75512e-b0aa-11f1-a105-0050568855da"
+    }
+  ]
+}

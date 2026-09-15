@@ -1,0 +1,459 @@
+{
+  "event": [
+    {
+      "code": "30",
+      "correlation_id": "2a6605ce",
+      "custom_id": "-1",
+      "flood_rate": "0",
+      "index": "68",
+      "origin": "oVirt",
+      "severity": "normal",
+      "time": 1789438559456,
+      "user": {
+        "name": "admin@ovirt@internalkeycloak-authz",
+        "href": "/ovirt-engine/api/users/6a84476b-a1c8-4773-961f-8d54d72ed231",
+        "id": "6a84476b-a1c8-4773-961f-8d54d72ed231"
+      },
+      "description": "User admin@ovirt@internalkeycloak-authz connecting from '192.168.60.96' using session 'REDACTED-SESSION-ID' logged in.",
+      "href": "/ovirt-engine/api/events/68",
+      "id": "68"
+    },
+    {
+      "code": "559",
+      "correlation_id": "8a7e8e3e-80c5-4669-9b2a-517f1239a714",
+      "custom_id": "-1",
+      "flood_rate": "0",
+      "index": "67",
+      "origin": "oVirt",
+      "severity": "normal",
+      "time": 1789438559118,
+      "cluster": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da",
+        "id": "6c75512e-b0aa-11f1-a105-0050568855da"
+      },
+      "host": {
+        "name": "olvm-kvm1",
+        "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a",
+        "id": "4bba6d9b-668b-4092-b4c2-ab2833b3f68a"
+      },
+      "description": "Installing Host olvm-kvm1. Populate service facts.",
+      "href": "/ovirt-engine/api/events/67",
+      "id": "67"
+    },
+    {
+      "code": "559",
+      "correlation_id": "8a7e8e3e-80c5-4669-9b2a-517f1239a714",
+      "custom_id": "-1",
+      "flood_rate": "0",
+      "index": "66",
+      "origin": "oVirt",
+      "severity": "normal",
+      "time": 1789438559103,
+      "cluster": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da",
+        "id": "6c75512e-b0aa-11f1-a105-0050568855da"
+      },
+      "host": {
+        "name": "olvm-kvm1",
+        "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a",
+        "id": "4bba6d9b-668b-4092-b4c2-ab2833b3f68a"
+      },
+      "description": "Installing Host olvm-kvm1. Collect facts about system services.",
+      "href": "/ovirt-engine/api/events/66",
+      "id": "66"
+    },
+    {
+      "code": "559",
+      "correlation_id": "8a7e8e3e-80c5-4669-9b2a-517f1239a714",
+      "custom_id": "-1",
+      "flood_rate": "0",
+      "index": "65",
+      "origin": "oVirt",
+      "severity": "normal",
+      "time": 1789438556092,
+      "cluster": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da",
+        "id": "6c75512e-b0aa-11f1-a105-0050568855da"
+      },
+      "host": {
+        "name": "olvm-kvm1",
+        "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a",
+        "id": "4bba6d9b-668b-4092-b4c2-ab2833b3f68a"
+      },
+      "description": "Installing Host olvm-kvm1. Check existence of /etc/fapolicyd/rules.d directory.",
+      "href": "/ovirt-engine/api/events/65",
+      "id": "65"
+    },
+    {
+      "code": "559",
+      "correlation_id": "8a7e8e3e-80c5-4669-9b2a-517f1239a714",
+      "custom_id": "-1",
+      "flood_rate": "0",
+      "index": "64",
+      "origin": "oVirt",
+      "severity": "normal",
+      "time": 1789438556084,
+      "cluster": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da",
+        "id": "6c75512e-b0aa-11f1-a105-0050568855da"
+      },
+      "host": {
+        "name": "olvm-kvm1",
+        "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a",
+        "id": "4bba6d9b-668b-4092-b4c2-ab2833b3f68a"
+      },
+      "description": "Installing Host olvm-kvm1. Configure host for vdsm.",
+      "href": "/ovirt-engine/api/events/64",
+      "id": "64"
+    },
+    {
+      "code": "559",
+      "correlation_id": "8a7e8e3e-80c5-4669-9b2a-517f1239a714",
+      "custom_id": "-1",
+      "flood_rate": "0",
+      "index": "63",
+      "origin": "oVirt",
+      "severity": "normal",
+      "time": 1789438550077,
+      "cluster": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da",
+        "id": "6c75512e-b0aa-11f1-a105-0050568855da"
+      },
+      "host": {
+        "name": "olvm-kvm1",
+        "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a",
+        "id": "4bba6d9b-668b-4092-b4c2-ab2833b3f68a"
+      },
+      "description": "Installing Host olvm-kvm1. Configure LVM filter.",
+      "href": "/ovirt-engine/api/events/63",
+      "id": "63"
+    },
+    {
+      "code": "559",
+      "correlation_id": "8a7e8e3e-80c5-4669-9b2a-517f1239a714",
+      "custom_id": "-1",
+      "flood_rate": "0",
+      "index": "62",
+      "origin": "oVirt",
+      "severity": "normal",
+      "time": 1789438547072,
+      "cluster": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da",
+        "id": "6c75512e-b0aa-11f1-a105-0050568855da"
+      },
+      "host": {
+        "name": "olvm-kvm1",
+        "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a",
+        "id": "4bba6d9b-668b-4092-b4c2-ab2833b3f68a"
+      },
+      "description": "Installing Host olvm-kvm1. Change the openvswitch_t to permissive.",
+      "href": "/ovirt-engine/api/events/62",
+      "id": "62"
+    },
+    {
+      "code": "559",
+      "correlation_id": "8a7e8e3e-80c5-4669-9b2a-517f1239a714",
+      "custom_id": "-1",
+      "flood_rate": "0",
+      "index": "61",
+      "origin": "oVirt",
+      "severity": "normal",
+      "time": 1789438541066,
+      "cluster": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da",
+        "id": "6c75512e-b0aa-11f1-a105-0050568855da"
+      },
+      "host": {
+        "name": "olvm-kvm1",
+        "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a",
+        "id": "4bba6d9b-668b-4092-b4c2-ab2833b3f68a"
+      },
+      "description": "Installing Host olvm-kvm1. Enable libvirtd monolithic daemon unit.",
+      "href": "/ovirt-engine/api/events/61",
+      "id": "61"
+    },
+    {
+      "code": "559",
+      "correlation_id": "8a7e8e3e-80c5-4669-9b2a-517f1239a714",
+      "custom_id": "-1",
+      "flood_rate": "0",
+      "index": "60",
+      "origin": "oVirt",
+      "severity": "normal",
+      "time": 1789438538052,
+      "cluster": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da",
+        "id": "6c75512e-b0aa-11f1-a105-0050568855da"
+      },
+      "host": {
+        "name": "olvm-kvm1",
+        "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a",
+        "id": "4bba6d9b-668b-4092-b4c2-ab2833b3f68a"
+      },
+      "description": "Installing Host olvm-kvm1. Remove modular sockets.",
+      "href": "/ovirt-engine/api/events/60",
+      "id": "60"
+    },
+    {
+      "code": "559",
+      "correlation_id": "8a7e8e3e-80c5-4669-9b2a-517f1239a714",
+      "custom_id": "-1",
+      "flood_rate": "0",
+      "index": "59",
+      "origin": "oVirt",
+      "severity": "normal",
+      "time": 1789438538047,
+      "cluster": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da",
+        "id": "6c75512e-b0aa-11f1-a105-0050568855da"
+      },
+      "host": {
+        "name": "olvm-kvm1",
+        "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a",
+        "id": "4bba6d9b-668b-4092-b4c2-ab2833b3f68a"
+      },
+      "description": "Installing Host olvm-kvm1. Stop libvirtd.",
+      "href": "/ovirt-engine/api/events/59",
+      "id": "59"
+    },
+    {
+      "code": "559",
+      "correlation_id": "8a7e8e3e-80c5-4669-9b2a-517f1239a714",
+      "custom_id": "-1",
+      "flood_rate": "0",
+      "index": "58",
+      "origin": "oVirt",
+      "severity": "normal",
+      "time": 1789438538028,
+      "cluster": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da",
+        "id": "6c75512e-b0aa-11f1-a105-0050568855da"
+      },
+      "host": {
+        "name": "olvm-kvm1",
+        "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a",
+        "id": "4bba6d9b-668b-4092-b4c2-ab2833b3f68a"
+      },
+      "description": "Installing Host olvm-kvm1. Mask libvirt modular daemon units.",
+      "href": "/ovirt-engine/api/events/58",
+      "id": "58"
+    },
+    {
+      "code": "559",
+      "correlation_id": "8a7e8e3e-80c5-4669-9b2a-517f1239a714",
+      "custom_id": "-1",
+      "flood_rate": "0",
+      "index": "57",
+      "origin": "oVirt",
+      "severity": "normal",
+      "time": 1789438532005,
+      "cluster": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da",
+        "id": "6c75512e-b0aa-11f1-a105-0050568855da"
+      },
+      "host": {
+        "name": "olvm-kvm1",
+        "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a",
+        "id": "4bba6d9b-668b-4092-b4c2-ab2833b3f68a"
+      },
+      "description": "Installing Host olvm-kvm1. Remove temp file.",
+      "href": "/ovirt-engine/api/events/57",
+      "id": "57"
+    },
+    {
+      "code": "559",
+      "correlation_id": "8a7e8e3e-80c5-4669-9b2a-517f1239a714",
+      "custom_id": "-1",
+      "flood_rate": "0",
+      "index": "56",
+      "origin": "oVirt",
+      "severity": "normal",
+      "time": 1789438531985,
+      "cluster": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da",
+        "id": "6c75512e-b0aa-11f1-a105-0050568855da"
+      },
+      "host": {
+        "name": "olvm-kvm1",
+        "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a",
+        "id": "4bba6d9b-668b-4092-b4c2-ab2833b3f68a"
+      },
+      "description": "Installing Host olvm-kvm1. Populate service facts.",
+      "href": "/ovirt-engine/api/events/56",
+      "id": "56"
+    },
+    {
+      "code": "559",
+      "correlation_id": "8a7e8e3e-80c5-4669-9b2a-517f1239a714",
+      "custom_id": "-1",
+      "flood_rate": "0",
+      "index": "55",
+      "origin": "oVirt",
+      "severity": "normal",
+      "time": 1789438531976,
+      "cluster": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da",
+        "id": "6c75512e-b0aa-11f1-a105-0050568855da"
+      },
+      "host": {
+        "name": "olvm-kvm1",
+        "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a",
+        "id": "4bba6d9b-668b-4092-b4c2-ab2833b3f68a"
+      },
+      "description": "Installing Host olvm-kvm1. Add QEMU client key file link.",
+      "href": "/ovirt-engine/api/events/55",
+      "id": "55"
+    },
+    {
+      "code": "559",
+      "correlation_id": "8a7e8e3e-80c5-4669-9b2a-517f1239a714",
+      "custom_id": "-1",
+      "flood_rate": "0",
+      "index": "54",
+      "origin": "oVirt",
+      "severity": "normal",
+      "time": 1789438528971,
+      "cluster": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da",
+        "id": "6c75512e-b0aa-11f1-a105-0050568855da"
+      },
+      "host": {
+        "name": "olvm-kvm1",
+        "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a",
+        "id": "4bba6d9b-668b-4092-b4c2-ab2833b3f68a"
+      },
+      "description": "Installing Host olvm-kvm1. Add QEMU server key file.",
+      "href": "/ovirt-engine/api/events/54",
+      "id": "54"
+    },
+    {
+      "code": "559",
+      "correlation_id": "8a7e8e3e-80c5-4669-9b2a-517f1239a714",
+      "custom_id": "-1",
+      "flood_rate": "0",
+      "index": "53",
+      "origin": "oVirt",
+      "severity": "normal",
+      "time": 1789438528968,
+      "cluster": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da",
+        "id": "6c75512e-b0aa-11f1-a105-0050568855da"
+      },
+      "host": {
+        "name": "olvm-kvm1",
+        "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a",
+        "id": "4bba6d9b-668b-4092-b4c2-ab2833b3f68a"
+      },
+      "description": "Installing Host olvm-kvm1. Set QEMU key path.",
+      "href": "/ovirt-engine/api/events/53",
+      "id": "53"
+    },
+    {
+      "code": "559",
+      "correlation_id": "8a7e8e3e-80c5-4669-9b2a-517f1239a714",
+      "custom_id": "-1",
+      "flood_rate": "0",
+      "index": "52",
+      "origin": "oVirt",
+      "severity": "normal",
+      "time": 1789438528965,
+      "cluster": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da",
+        "id": "6c75512e-b0aa-11f1-a105-0050568855da"
+      },
+      "host": {
+        "name": "olvm-kvm1",
+        "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a",
+        "id": "4bba6d9b-668b-4092-b4c2-ab2833b3f68a"
+      },
+      "description": "Installing Host olvm-kvm1. Add vdsm key files.",
+      "href": "/ovirt-engine/api/events/52",
+      "id": "52"
+    },
+    {
+      "code": "559",
+      "correlation_id": "8a7e8e3e-80c5-4669-9b2a-517f1239a714",
+      "custom_id": "-1",
+      "flood_rate": "0",
+      "index": "51",
+      "origin": "oVirt",
+      "severity": "normal",
+      "time": 1789438528957,
+      "cluster": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da",
+        "id": "6c75512e-b0aa-11f1-a105-0050568855da"
+      },
+      "host": {
+        "name": "olvm-kvm1",
+        "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a",
+        "id": "4bba6d9b-668b-4092-b4c2-ab2833b3f68a"
+      },
+      "description": "Installing Host olvm-kvm1. Set vdsm key path.",
+      "href": "/ovirt-engine/api/events/51",
+      "id": "51"
+    },
+    {
+      "code": "559",
+      "correlation_id": "8a7e8e3e-80c5-4669-9b2a-517f1239a714",
+      "custom_id": "-1",
+      "flood_rate": "0",
+      "index": "50",
+      "origin": "oVirt",
+      "severity": "normal",
+      "time": 1789438528954,
+      "cluster": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da",
+        "id": "6c75512e-b0aa-11f1-a105-0050568855da"
+      },
+      "host": {
+        "name": "olvm-kvm1",
+        "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a",
+        "id": "4bba6d9b-668b-4092-b4c2-ab2833b3f68a"
+      },
+      "description": "Installing Host olvm-kvm1. Add QEMU client cert file link.",
+      "href": "/ovirt-engine/api/events/50",
+      "id": "50"
+    },
+    {
+      "code": "559",
+      "correlation_id": "8a7e8e3e-80c5-4669-9b2a-517f1239a714",
+      "custom_id": "-1",
+      "flood_rate": "0",
+      "index": "49",
+      "origin": "oVirt",
+      "severity": "normal",
+      "time": 1789438528950,
+      "cluster": {
+        "name": "Default",
+        "href": "/ovirt-engine/api/clusters/6c75512e-b0aa-11f1-a105-0050568855da",
+        "id": "6c75512e-b0aa-11f1-a105-0050568855da"
+      },
+      "host": {
+        "name": "olvm-kvm1",
+        "href": "/ovirt-engine/api/hosts/4bba6d9b-668b-4092-b4c2-ab2833b3f68a",
+        "id": "4bba6d9b-668b-4092-b4c2-ab2833b3f68a"
+      },
+      "description": "Installing Host olvm-kvm1. Add QEMU server cert file.",
+      "href": "/ovirt-engine/api/events/49",
+      "id": "49"
+    }
+  ]
+}

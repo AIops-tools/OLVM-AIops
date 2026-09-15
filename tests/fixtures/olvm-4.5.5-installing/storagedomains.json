@@ -1,0 +1,66 @@
+{
+  "storage_domain": [
+    {
+      "backup": "false",
+      "block_size": "512",
+      "committed": "0",
+      "critical_space_action_blocker": "0",
+      "discard_after_delete": "false",
+      "external_status": "ok",
+      "master": "false",
+      "status": "unattached",
+      "storage": {
+        "type": "glance"
+      },
+      "storage_format": "v1",
+      "supports_discard": "false",
+      "supports_discard_zeroes_data": "false",
+      "type": "image",
+      "warning_low_space_indicator": "0",
+      "wipe_after_delete": "false",
+      "actions": {
+        "link": [
+          {
+            "href": "/ovirt-engine/api/storagedomains/072fbaa1-08f3-4a40-9f34-a5ca22dd1d74/refreshluns",
+            "rel": "refreshluns"
+          },
+          {
+            "href": "/ovirt-engine/api/storagedomains/072fbaa1-08f3-4a40-9f34-a5ca22dd1d74/reduceluns",
+            "rel": "reduceluns"
+          },
+          {
+            "href": "/ovirt-engine/api/storagedomains/072fbaa1-08f3-4a40-9f34-a5ca22dd1d74/isattached",
+            "rel": "isattached"
+          },
+          {
+            "href": "/ovirt-engine/api/storagedomains/072fbaa1-08f3-4a40-9f34-a5ca22dd1d74/updateovfstore",
+            "rel": "updateovfstore"
+          }
+        ]
+      },
+      "name": "ovirt-image-repository",
+      "description": "",
+      "comment": "",
+      "link": [
+        {
+          "href": "/ovirt-engine/api/storagedomains/072fbaa1-08f3-4a40-9f34-a5ca22dd1d74/permissions",
+          "rel": "permissions"
+        },
+        {
+          "href": "/ovirt-engine/api/storagedomains/072fbaa1-08f3-4a40-9f34-a5ca22dd1d74/diskprofiles",
+          "rel": "diskprofiles"
+        },
+        {
+          "href": "/ovirt-engine/api/storagedomains/072fbaa1-08f3-4a40-9f34-a5ca22dd1d74/disksnapshots",
+          "rel": "disksnapshots"
+        },
+        {
+          "href": "/ovirt-engine/api/storagedomains/072fbaa1-08f3-4a40-9f34-a5ca22dd1d74/images",
+          "rel": "images"
+        }
+      ],
+      "href": "/ovirt-engine/api/storagedomains/072fbaa1-08f3-4a40-9f34-a5ca22dd1d74",
+      "id": "072fbaa1-08f3-4a40-9f34-a5ca22dd1d74"
+    }
+  ]
+}

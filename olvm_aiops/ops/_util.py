@@ -4,8 +4,9 @@ Shapes verified against a live OLVM 4.5.5 engine (JSON representation):
 
   * a collection is ``{"<singular>": [ ... ]}`` — ``{"host": [...]}``,
     ``{"storage_domain": [...]}`` — and an EMPTY collection may omit the key;
-  * every scalar is a JSON **string**, numbers and booleans included
-    (``"memory": "0"``, ``"update_available": "false"``);
+  * counts, sizes and flags are JSON **strings** (``"memory": "0"``,
+    ``"update_available": "false"``), but timestamps are JSON **numbers** in
+    epoch milliseconds (``"time": 1789438559456``) — never assume one type;
   * a field the engine has no value for is absent, not zero — an unattached
     storage domain carries no ``available`` / ``used`` at all.
 
@@ -15,6 +16,7 @@ and both return ``None`` for "not reported" rather than inventing a 0 or False.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 from olvm_aiops.governance import opt_str
@@ -57,6 +59,21 @@ def as_bool(value: Any) -> bool | None:
         if text == "false":
             return False
     return None
+
+
+def ms_to_iso(value: Any) -> str | None:
+    """An engine timestamp (epoch milliseconds, number or numeric string) as ISO-8601 UTC.
+
+    ``None`` when absent, a flag, non-numeric, or outside the representable range —
+    one absurd value must not take down a whole listing.
+    """
+    ms = as_int(value)
+    if ms is None:
+        return None
+    try:
+        return datetime.fromtimestamp(ms / 1000, tz=UTC).isoformat().replace("+00:00", "Z")
+    except (OverflowError, OSError, ValueError):
+        return None
 
 
 def text(value: Any, limit: int = 256) -> str | None:

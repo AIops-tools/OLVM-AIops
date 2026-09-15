@@ -67,8 +67,9 @@ def _tls_verify_failure(exc: BaseException) -> ssl.SSLCertVerificationError | No
 
 
 def _tls_message(origin: str, err: ssl.SSLCertVerificationError) -> str:
+    reason = str(err.verify_message or err).rstrip(".")
     return (
-        f"TLS verification failed for {origin}: {err.verify_message or err}. The engine "
+        f"TLS verification failed for {origin}: {reason}. The engine "
         f"answered, but its certificate could not be trusted — this is not a "
         f"connectivity fault. Use the engine's FQDN in 'url' (its certificate is issued "
         f"to that name, not to an IP), point 'ca_file' at the engine CA "

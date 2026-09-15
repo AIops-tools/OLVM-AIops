@@ -66,3 +66,13 @@ def test_pct_and_ref_id():
     assert u.pct(25, 200) == 12.5
     assert u.pct(None, 200) is None and u.pct(1, 0) is None
     assert u.ref_id({"href": "/x", "id": "abc"}) == "abc" and u.ref_id(None) is None
+
+
+@pytest.mark.parametrize(("raw", "want"), [
+    (1789438559456, "2026-09-15T02:15:59.456000Z"),
+    ("1789438559456", "2026-09-15T02:15:59.456000Z"),
+    (0, "1970-01-01T00:00:00Z"),
+    (None, None), (True, None), ("soon", None), (9223372036854775807, None)])
+def test_ms_to_iso_reads_engine_epoch_millis(raw, want):
+    """Live events/jobs carry time as a JSON number of epoch ms; Long.MAX must not crash."""
+    assert u.ms_to_iso(raw) == want
