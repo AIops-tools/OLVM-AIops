@@ -164,6 +164,41 @@ def test_transport_error_is_not_flagged_as_a_timeout():
     assert ei.value.timed_out is False and "Transport error" in str(ei.value)
 
 
+@pytest.mark.unit
+def test_certificate_verification_failure_is_not_called_unreachable():
+    """Live lab: engine CA + an IP url fails verification on 'IP address mismatch'.
+    The engine answered; telling the operator to check the url and that the engine
+    is running sends them after a network that is fine (bug class #5)."""
+    import ssl
+
+    def untrusted(req):
+        err = ssl.SSLCertVerificationError(1, "certificate verify failed")
+        err.verify_message = "IP address mismatch, certificate is not valid for '192.168.60.85'"
+        raise httpx.ConnectError("[SSL: CERTIFICATE_VERIFY_FAILED]", request=req) from err
+
+    target = _target(url="https://192.168.60.85")
+    client = httpx.Client(base_url=target.origin, transport=httpx.MockTransport(untrusted))
+    with pytest.raises(OlvmApiError) as ei:
+        OlvmConnection(target, client=client)
+    msg = str(ei.value)
+    assert "TLS verification failed" in msg and "IP address mismatch" in msg
+    assert "FQDN" in msg and "ca_file" in msg
+    assert "Could not reach" not in msg
+
+
+@pytest.mark.unit
+def test_a_plain_connect_error_still_reads_as_unreachable():
+    """Positive control: only a verification failure changes the headline."""
+    def refused(req):
+        raise httpx.ConnectError("connection refused", request=req)
+
+    target = _target()
+    client = httpx.Client(base_url=target.origin, transport=httpx.MockTransport(refused))
+    with pytest.raises(OlvmApiError) as ei:
+        OlvmConnection(target, client=client)
+    assert "Could not reach the engine" in str(ei.value)
+
+
 # ─── token renewal ──────────────────────────────────────────────────────────
 
 

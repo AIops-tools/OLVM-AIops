@@ -23,6 +23,7 @@ the engine's own ``fault`` reason and detail.
 from __future__ import annotations
 
 import atexit
+import ssl
 import threading
 import time
 import weakref
@@ -51,6 +52,29 @@ def _seg(value: Any) -> str:
     ``params=`` must NOT go through this (httpx encodes those itself).
     """
     return quote(str(value), safe="")
+
+
+def _tls_verify_failure(exc: BaseException) -> ssl.SSLCertVerificationError | None:
+    """The certificate-verification error behind an httpx transport error, if any."""
+    seen: set[int] = set()
+    cur: BaseException | None = exc
+    while cur is not None and id(cur) not in seen:
+        if isinstance(cur, ssl.SSLCertVerificationError):
+            return cur
+        seen.add(id(cur))
+        cur = cur.__cause__ or cur.__context__
+    return None
+
+
+def _tls_message(origin: str, err: ssl.SSLCertVerificationError) -> str:
+    return (
+        f"TLS verification failed for {origin}: {err.verify_message or err}. The engine "
+        f"answered, but its certificate could not be trusted — this is not a "
+        f"connectivity fault. Use the engine's FQDN in 'url' (its certificate is issued "
+        f"to that name, not to an IP), point 'ca_file' at the engine CA "
+        f"(/ovirt-engine/services/pki-resource?resource=ca-certificate&format=X509-PEM-CA), "
+        f"or set verify_ssl: false on a throwaway lab engine only."
+    )
 
 
 class OlvmApiError(Exception):
@@ -157,6 +181,10 @@ class OlvmConnection:
                 timed_out=True,
             ) from exc
         except httpx.HTTPError as exc:
+            tls = _tls_verify_failure(exc)
+            if tls is not None:
+                raise OlvmApiError(_tls_message(self._target.origin, tls),
+                                   path=SSO_TOKEN_PATH) from exc
             raise OlvmApiError(
                 f"Could not reach the engine at {self._target.origin}: {exc}. Check the "
                 f"url and that ovirt-engine is running.",
@@ -240,6 +268,9 @@ class OlvmConnection:
                 timed_out=True,
             ) from exc
         except httpx.HTTPError as exc:
+            tls = _tls_verify_failure(exc)
+            if tls is not None:
+                raise OlvmApiError(_tls_message(self._target.origin, tls), path=path) from exc
             raise OlvmApiError(
                 f"Transport error on {method} {path}: {exc}. Check connectivity to "
                 f"{self._target.origin}.",
