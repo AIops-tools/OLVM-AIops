@@ -1,7 +1,7 @@
 {
   "name": "@zw008/olvm-aiops",
-  "version": "0.2.0",
-  "description": "Governed OLVM / oVirt 4.5 ops — 17 MCP tools: inventory, health, capacity, diagnosis; audited.",
+  "version": "0.2.1",
+  "description": "Governed OLVM / oVirt 4.5 ops \u2014 17 MCP tools: inventory, health, capacity, diagnosis; audited.",
   "private": true,
   "license": "MIT",
   "homepage": "https://github.com/AIops-tools/OLVM-AIops",
