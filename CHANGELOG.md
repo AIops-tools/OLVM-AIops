@@ -13,7 +13,10 @@ against a small production engine with 8 hosts and an FC data domain.
   `/vms` read to the diagnosis, made once and only when such a finding exists; a VM list that
   cannot be read (a restricted account) is reported as `error` with `total: null`, never as a
   host running nothing, and does not fail the diagnosis. `scanTruncated` says the VM scan
-  itself was cut at 1000, which makes `total` a lower bound.
+  itself was cut at 1000, which makes `total` a lower bound. When the read failed there is no
+  scan to describe, so `truncated` and `scanTruncated` are `null` rather than `false`. The
+  envelope's `limit` is fixed; for the whole list on a busy host, read `vm_list` with
+  `search="host=<name>"`.
 - The over-commit finding's signal carries actual use next to the commitment
   (`committed 192.0% of capacity, in use 43.7% (56.3% free)`).
 
@@ -27,10 +30,13 @@ against a small production engine with 8 hosts and an FC data domain.
   superseded by the host's own recovery. The same command failing for another reason (a vdsm
   transport timeout, say) is about the host's link to vdsm and stays a host finding, as does
   every other vdsm command failure.
-- Event 10802 is now grouped per command instead of per code. It wraps every vdsm command, so
-  one group per host and code let the newest member classify the rest: a `SpmStatusVDS`
-  failure followed by a guest-agent one was reported as the guest-agent finding, and its text
-  appeared nowhere in the payload.
+- Event 10802 is now grouped per condition — the command, plus whether the message names the
+  guest agent — instead of per code. It wraps every vdsm command, so one group per host and
+  code let the newest member classify the rest: a `SpmStatusVDS` failure followed by a
+  guest-agent one was reported as the guest-agent finding, and its text appeared nowhere in
+  the payload. The command alone is not enough either, because one command reports both
+  conditions: a `VmLogonVDS` transport timeout must not be collapsed into a newer
+  `VmLogonVDS` guest-agent failure.
 - The over-commit cause no longer claims free space is "within the domain's own thresholds"
   when the engine set none. It reports 0 for a domain with no low-space warning, and 0 can
   never be crossed; the finding now says no check was made and points at the free space in

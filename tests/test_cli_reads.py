@@ -145,3 +145,22 @@ def test_host_health_says_when_the_candidate_scan_was_cut(monkeypatch):
     assert r.exit_code == 0, r.output
     out = " ".join(r.stdout.split())
     assert "PARTIAL: the VM scan was cut short" in out
+
+
+def test_host_health_says_how_many_candidates_it_did_not_print(monkeypatch):
+    import olvm_aiops.ops.diagnose as dg
+
+    monkeypatch.setattr(dg, "VM_CANDIDATE_LIMIT", 2)
+    events = {"event": [{"index": "9", "code": "10802", "severity": "error",
+                         "time": 1789441200 * 1000 - 600_000,
+                         "description": "VDSM olvm-kvm1 command VmLogonVDS failed: "
+                                        "Guest agent non-responsive",
+                         "host": {"id": "h1", "name": "olvm-kvm1"}}]}
+    vms = {"vm": [{"id": f"v{i}", "name": f"app0{i}", "status": "up", "host": {"id": "h1"}}
+                  for i in range(5)]}
+    _wire(monkeypatch, {"/hosts": {"host": [{"id": "h1", "name": "olvm-kvm1", "status": "up"}]},
+                        "/events": events, "/vms": vms})
+    r = runner.invoke(app, ["host", "health"])
+    assert r.exit_code == 0, r.output
+    out = " ".join(r.stdout.split())
+    assert "VM candidates (not confirmed): app00, app01 (+3 more)" in out

@@ -121,7 +121,7 @@ def test_overcommit_alone_reads_as_a_planning_limit_and_shows_actual_use():
     assert f["severity"] == "low" and out["healthy"] is True
     assert f["signal"] == "committed 192.0% of capacity, in use 43.7% (56.3% free)"
     assert "planning limit, not current pressure" in f["cause"]
-    assert "above the thresholds the engine set" in f["cause"]
+    assert "above what the engine set" in f["cause"]
     assert "before it reaches its low-space threshold (10% free)" in f["action"]
 
 
@@ -166,3 +166,18 @@ def test_a_low_space_warning_without_a_blocker_does_not_quote_a_none_threshold()
     f = _only(dg.storage_capacity_rca(_conn(mutate_global=no_blocker)))
     assert f["severity"] == "medium" and "None" not in f["action"]
     assert f["action"].endswith("before it reaches the critical blocker.")
+
+
+def test_with_only_a_critical_blocker_the_action_does_not_call_it_an_early_warning():
+    """Review: the fallback quoted the blocker as "its low-space threshold" — that is the
+    point where the engine already refuses new disks, not a warning ahead of it."""
+    def blocker_only(sd):
+        sd["available"], sd["used"] = str(50 * GIB), str(50 * GIB)
+        sd["committed"] = str(150 * GIB)
+        sd["warning_low_space_indicator"] = "0"
+    f = _only(dg.storage_capacity_rca(_conn(mutate_global=blocker_only)))
+    assert f["severity"] == "low"
+    assert "the critical blocker (5 GiB free)" in f["action"]
+    assert "low-space threshold" not in f["action"]
+    assert "no earlier signal" in f["action"]
+    assert "thresholds" not in f["cause"]  # exactly one comparison was made

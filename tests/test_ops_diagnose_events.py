@@ -459,3 +459,53 @@ def test_events_of_one_code_stay_one_finding_even_when_they_quote_commands():
               for i in (1, 2)]
     [f] = dg.host_health_rca(Engine(events, hosts=[host("up")]))["findings"]
     assert "(×2 in window)" in f["signal"] and f["severity"] == "high"
+
+
+def test_two_conditions_of_one_command_do_not_share_a_finding():
+    """Second review: splitting 10802 by command still merged "guest agent non-responsive"
+    with "Message timeout" — the same command reports two different conditions, and the
+    newest member classified both."""
+    events = [vdsm_failure(1, "VmLogonVDS", "Message timeout which can be caused by "
+                           "communication issues", minutes_ago=60),
+              vdsm_failure(2, "VmLogonVDS", "Message timeout which can be caused by "
+                           "communication issues", minutes_ago=50),
+              vdsm_failure(3, "VmLogonVDS", "Guest agent non-responsive", minutes_ago=5)]
+    out = dg.host_health_rca(Engine(events, hosts=[host("up")], vms=[on_host("vm1")]))
+    by_severity = {f["severity"]: f for f in out["findings"]}
+    assert set(by_severity) == {"high", "low"}
+    high = by_severity["high"]["signal"]
+    assert "Message timeout" in high and "×2" in high
+    assert "Guest agent" in by_severity["low"]["signal"] and "×" not in by_severity["low"]["signal"]
+    assert out["healthy"] is False
+
+
+def test_a_guest_agent_message_under_another_command_is_still_a_host_finding():
+    """Both halves are required: the command says the call went into a VM."""
+    engine = Engine([vdsm_failure(1, "VmLockVDS", "Guest agent non-responsive")],
+                    hosts=[host("up")], vms=[on_host("vm1")])
+    [f] = dg.host_health_rca(engine)["findings"]
+    assert f["severity"] == "high" and "vmCandidates" not in f
+
+
+def test_the_hyphenated_spelling_of_the_guest_agent_message_also_matches():
+    engine = Engine([vdsm_failure(1, "VmLogonVDS", "Guest-agent non-responsive")],
+                    hosts=[host("up")], vms=[on_host("vm1")])
+    [f] = dg.host_health_rca(engine)["findings"]
+    assert f["severity"] == "low" and f["vmCandidates"]["total"] == 1
+
+
+def test_a_failed_read_reports_no_truncation_it_did_not_measure():
+    engine = Engine([vdsm_failure(1, "VmLogonVDS", "Guest agent non-responsive")],
+                    hosts=[host("up")])
+    engine.routes["/vms"] = OlvmApiError("403 Forbidden")
+    [f] = dg.host_health_rca(engine)["findings"]
+    c = f["vmCandidates"]
+    assert c["total"] is None and c["truncated"] is None and c["scanTruncated"] is None
+
+
+def test_candidates_are_listed_in_a_stable_order():
+    vms = [on_host(n) for n in ("charlie", "alpha", "bravo")]
+    engine = Engine([vdsm_failure(1, "VmLogonVDS", "Guest agent non-responsive")],
+                    hosts=[host("up")], vms=vms)
+    [f] = dg.host_health_rca(engine)["findings"]
+    assert [v["name"] for v in f["vmCandidates"]["vms"]] == ["alpha", "bravo", "charlie"]

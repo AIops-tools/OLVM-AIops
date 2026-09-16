@@ -41,7 +41,9 @@ what any model decides. Do not rely on prompt wording for this.
 6. **Follow events with the cursor.** Pass the highest `index` returned as `after_index`; the
    events after it come back oldest first — repeat while `truncated` is true.
 7. **`vmCandidates` is a candidate list, not an answer.** A guest-agent event names no VM;
-   say "one of these VMs", never "the affected VM is X" — even when only one is listed.
+   say "one of these VMs", never "the affected VM is X" — even when only one is listed. It has
+   no `limit` knob: for the whole list on a busy host read `vm_list` with `search="host=<name>"`,
+   and if its `error` is set or `scanTruncated` is true, say the candidate list is incomplete.
 8. **Over-commit is not the same as low space.** An over-committed domain with free space left
    is a planning limit; only a low-space or critical-blocker finding means it is running out.
 9. **Do not fabricate write operations.** This release cannot start, stop, migrate or snapshot;

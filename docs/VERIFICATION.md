@@ -155,6 +155,10 @@ current pressure. Its signal now carries actual use, and the cause says which of
       with a self-hosted storage domain in the same engine (§2b). Open: iSCSI and Gluster
       domains, a self-hosted **engine** deployment as such, and OLVM on Oracle Linux 8.
 - [ ] An engine behind a directory profile (LDAP / AD user@profile).
+- [ ] An engine serving a **translated** `AuditLogMessages` bundle: the guest-agent
+      rule reads the command name and the message out of the engine's English text, so
+      on a localized engine event 10802 falls back to a plain host finding (an
+      over-report, never an under-report). Not reproduced.
 - [ ] An engine that has run for days: host and VM events on both sides of the 24 h window
       (`eventsOutsideWindow`), and a VM that failed, started and was shut down again.
 - [ ] Login backoff: change the account password while the MCP server runs — one failed

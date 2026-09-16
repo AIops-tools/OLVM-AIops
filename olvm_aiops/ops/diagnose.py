@@ -56,10 +56,13 @@ VDSM_COMMAND_FAILURE = 10802
 #: VmLogonVDS/VmLogoffVDS). They fail when the guest agent is missing or not responding,
 #: which is a condition of that guest, not of the host.
 GUEST_AGENT_COMMANDS = ("VmLogon", "VmLogoff")
-#: The engine's message for the guest-agent condition ("Guest agent non-responsive", and the
-#: unhyphenated spelling). The same command can fail for a transport reason ("Message timeout
-#: which can be caused by communication issues"), which IS about the host's link to vdsm — so
-#: the command alone must not downgrade the finding.
+#: The engine's message for the guest-agent condition ("Guest agent non-responsive"); the
+#: description is lowercased and its hyphens turned into spaces first, so "Guest-agent" matches
+#: too. The same command can fail for a transport reason ("Message timeout which can be caused
+#: by communication issues"), which IS about the host's link to vdsm — so the command alone
+#: must not downgrade the finding. Both this and the command are read out of the engine's
+#: English message; on an engine serving a translated AuditLogMessages bundle neither matches,
+#: and the event stays a plain host finding (over-report, never under-report).
 GUEST_AGENT_MESSAGE = "guest agent"
 #: Most candidate VMs listed on a guest-scoped finding.
 VM_CANDIDATE_LIMIT = 10
@@ -188,10 +191,21 @@ def _recovery_times(conn: Any, codes: set[int], cutoff_ms: int,
 def _event_subkey(raw: dict) -> str | None:
     """What splits a code into separate conditions. Only event 10802 has one: it wraps any
     vdsm command, so grouping the whole code together would let the newest member classify
-    a `SpmStatusVDS` failure as whatever the newest `VmLogonVDS` was."""
+    a `SpmStatusVDS` failure as whatever the newest `VmLogonVDS` was.
+
+    The command alone is not enough: one command reports two different conditions, and
+    ``VmLogonVDS failed: Message timeout`` (the host's link to vdsm) must not be collapsed
+    into a newer ``VmLogonVDS failed: Guest agent non-responsive``. The key is therefore the
+    condition — the command, plus whether this is the guest-agent one — and it is read from
+    the same text the classifier sees.
+    """
     if u.as_int(raw.get("code")) != VDSM_COMMAND_FAILURE:
         return None
-    return vdsm_command(raw.get("description"))
+    description = event_row(raw)["description"]
+    command = vdsm_command(description)
+    if command is None:
+        return None
+    return f"{command}|guest-agent" if guest_agent_command(description) else command
 
 
 def group_events(pairs: list[tuple[str, dict]]) -> list[dict]:
@@ -231,6 +245,19 @@ def vdsm_command(description: Any) -> str | None:
     return match.group(1) if match else None
 
 
+def guest_agent_command(description: Any) -> str | None:
+    """The guest-agent command this description reports, when it reports one.
+
+    Both halves of the engine's message are needed: the command says the call went into a
+    VM, the message says the guest agent is what failed. Either alone is not the condition.
+    """
+    command = vdsm_command(description)
+    if command is None or not command.startswith(GUEST_AGENT_COMMANDS):
+        return None
+    normalised = str(description or "").lower().replace("-", " ")
+    return command if GUEST_AGENT_MESSAGE in normalised else None
+
+
 def guest_agent_failure(ev: dict) -> tuple[str, str, str] | None:
     """(severity, cause, action) when this event is a guest-agent call that failed.
 
@@ -241,12 +268,10 @@ def guest_agent_failure(ev: dict) -> tuple[str, str, str] | None:
     """
     if ev["code"] != VDSM_COMMAND_FAILURE:
         return None
-    command = vdsm_command(ev["description"])
-    if command is None or not command.startswith(GUEST_AGENT_COMMANDS):
-        return None
-    if GUEST_AGENT_MESSAGE not in str(ev["description"] or "").lower().replace("-", " "):
-        # A guest-agent verb that failed for another reason (a vdsm transport timeout, say)
-        # is not evidence that the host is fine; leave it on the normal host path.
+    # A guest-agent verb that failed for another reason (a vdsm transport timeout, say) is
+    # not evidence that the host is fine; it stays on the normal host path.
+    command = guest_agent_command(ev["description"])
+    if command is None:
         return None
     return ("low",
             f"The vdsm command {command} failed on this host, and the engine's message names "
@@ -257,7 +282,8 @@ def guest_agent_failure(ev: dict) -> tuple[str, str, str] | None:
             "from the console.",
             "Check the guest agent (ovirt-guest-agent / qemu-guest-agent) inside the VM. "
             "The event names no VM, so vmCandidates lists the VMs the engine reports on "
-            "this host: candidates to check, not a confirmed mapping.")
+            "this host: candidates to check, not a confirmed mapping. For the full list on "
+            "a busy host, read vm_list with search='host=<name>'.")
 
 
 def _ranked(findings: list[dict], subject_key: str) -> list[dict]:
@@ -357,10 +383,12 @@ def vm_candidates(conn: Any) -> Callable[[str], dict]:
                           for v in cache["rows"] if v["hostId"] == host_id),
                          key=lambda v: v["name"] or "")
         shown = on_host[:VM_CANDIDATE_LIMIT]
+        failed = cache["error"] is not None
         return {**u.envelope("vms", shown, VM_CANDIDATE_LIMIT,
-                             len(on_host) > VM_CANDIDATE_LIMIT),
-                "total": None if cache["error"] is not None else len(on_host),
-                "scanTruncated": cache["cut"],
+                             None if failed else len(on_host) > VM_CANDIDATE_LIMIT),
+                # A read that failed has no scan to describe: null, not "nothing was cut".
+                "total": None if failed else len(on_host),
+                "scanTruncated": None if failed else cache["cut"],
                 "error": cache["error"]}
 
     return lookup
@@ -543,13 +571,18 @@ def _sd_capacity_findings(sd: dict) -> list[dict]:
             action = ("Free space or extend the domain: over-commit is only safe while free "
                       "space lasts.")
         elif checked:
-            cause = (promised + "Free space is still above the thresholds the engine set for "
-                     "this domain, so this is a planning limit, not current pressure: writes "
-                     "fail only once guests grow into what was promised.")
-            named = (f" ({warning}% free)" if warning is not None and warning > 0
-                     else f" ({blocker} GiB free)")
+            cause = (promised + "Free space is still above what the engine set for this "
+                     "domain, so this is a planning limit, not current pressure: writes fail "
+                     "only once guests grow into what was promised.")
+            if warning is not None and warning > 0:
+                limit = f"its low-space threshold ({warning}% free)"
+            else:
+                # Only the hard stop exists: say so, and do not call it an early warning.
+                limit = (f"the critical blocker ({blocker} GiB free), where the engine refuses "
+                         "new disks and snapshots — no low-space warning is set for this "
+                         "domain, so there will be no earlier signal")
             action = ("No action while free space holds. Track how fast actual use grows and "
-                      f"extend the domain before it reaches its low-space threshold{named}.")
+                      f"extend the domain before it reaches {limit}.")
         else:
             cause = (promised + "The engine reports no low-space threshold for this domain "
                      "(warning_low_space_indicator and critical_space_action_blocker are 0 or "
