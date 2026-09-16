@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.0 — 2026-09-16
 
 ### Added
 - `storage_capacity_rca` reports a domain the engine cannot warn about. The engine returns 0
