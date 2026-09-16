@@ -61,6 +61,24 @@ def print_findings(out: dict, subject_key: str) -> None:
         console.print(f"[{colour}]{f['rank']}. {label} {escape(f.get(subject_key) or '-')}: "
                       f"{escape(f['signal'])}[/]")
         console.print(f"   cause: {escape(f['cause'])}\n   action: {escape(f['action'])}")
+        _print_candidates(f.get("vmCandidates"))
+
+
+def _print_candidates(candidates: dict | None) -> None:
+    """The VMs a finding could be about — never printed as the VM it is about."""
+    if candidates is None:
+        return
+    if candidates["error"] is not None:
+        console.print("   [yellow]VM candidates: not readable — "
+                      f"{escape(candidates['error'])}[/]")
+        return
+    names = ", ".join(escape(v["name"] or v["id"] or "-") for v in candidates["vms"])
+    more = (f" (+{candidates['total'] - candidates['returned']} more)"
+            if candidates["truncated"] else "")
+    console.print(f"   VM candidates (not confirmed): {names or 'none on this host'}{more}")
+    if candidates["scanTruncated"]:
+        console.print("   [yellow]PARTIAL: the VM scan was cut short, so this list and its "
+                      "count are a lower bound.[/]")
 
 
 @datacenter_app.command("list")

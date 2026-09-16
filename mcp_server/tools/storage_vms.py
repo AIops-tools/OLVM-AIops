@@ -89,8 +89,10 @@ def storage_capacity_rca(events_limit: int = 200, events_window_hours: int = 24,
     disks are committed beyond capacity while space is low (low on its own); high when
     an attached domain is inactive, unknown or mixed. Warning-or-worse events naming a
     storage domain (for example "deactivated by system") are attached to it.
-    Unattached domains such as the default image repository are skipped. Report
-    findings in rank order and quote their signal.
+    Unattached domains such as the default image repository are skipped. Over-commit
+    on its own is a planning limit, and its signal carries actual use next to it: do
+    not report an over-committed domain as short of space unless a low-space or
+    blocker finding says so. Report findings in rank order and quote their signal.
 
     Args:
         events_limit: Recent warning-or-worse events to correlate, 1-1000 (default 200).

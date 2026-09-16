@@ -26,7 +26,7 @@ compatibility: >
   Writes: none in this release. Every tool is a read or a diagnosis.
   Webhooks: none — no outbound network calls beyond the configured engine URL.
   SSL: verify_ssl defaults to true; set ca_file to the engine CA (https://<engine>/ovirt-engine/services/pki-resource?resource=ca-certificate&format=X509-PEM-CA) and use the engine's FQDN, whose certificate does not cover its IP.
-  Verification status: every read and all four diagnoses were run against a live Oracle Linux Virtualization Manager 4.5.5-1.73.el9 engine (Keycloak enabled) with one KVM host, an NFS data domain and a VM; tests use payloads captured from it. Not yet verified on a production-scale engine, on iSCSI/FC domains, or on multi-host clusters. See docs/VERIFICATION.md.
+  Verification status: every read and all four diagnoses were run against a live Oracle Linux Virtualization Manager 4.5.5-1.73.el9 engine (Keycloak enabled) with one KVM host, an NFS data domain and a VM; tests use payloads captured from it. A user has since run the read-only tools against a small production engine with 8 hosts and an FC data domain, matching the engine's own API. Not yet verified on iSCSI/Gluster domains, on self-hosted engine deployments, on engines without Keycloak, under a read-only account, or past the scan limits (1000 objects). See docs/VERIFICATION.md.
 ---
 
 # OLVM AIops
@@ -87,7 +87,7 @@ Needs `uvx` on `PATH`: the MCP server is fetched with uv, pinned to this release
 ### 1. "Is anything wrong right now?"
 
 1. `engine_health_rca`, then `host_health_rca`, then `storage_capacity_rca`, then `vm_health_rca`.
-2. Report findings in `rank` order and quote each `signal`. Severity `info` means in progress or superseded — a host the engine is rebooting after deployment, an old event the host or VM has since recovered from — and `low` is informational, such as alert 9000 on a host without fencing hardware. Neither is a fault.
+2. Report findings in `rank` order and quote each `signal`. Severity `info` means in progress or superseded — a host the engine is rebooting after deployment, an old event the host or VM has since recovered from — and `low` means it is not a fault of the object the finding is on — alert 9000 on a host without fencing hardware, or a guest-agent call that failed on a healthy host. A `low` finding can still carry work: read its `action`.
 3. For context on a finding, `event_list` with `min_severity="warning"`, and `job_list` with `status="failed"`.
 
 ### 2. "Storage is filling up" / "the engine won't create a disk"
@@ -126,7 +126,7 @@ Needs `uvx` on `PATH`: the MCP server is fetched with uv, pinned to this release
 | Tool | What it answers |
 |---|---|
 | `engine_health_rca` | Engine problems ranked: health check, clock skew, engine/CA certificate expiry, engine backups, cluster HA reservation, data-center status |
-| `host_health_rca` | Host problems ranked: broken states with status detail, reinstall/update flags, host certificate expiry, host events |
+| `host_health_rca` | Host problems ranked: broken states with status detail, reinstall/update flags, host certificate expiry, host events. A failed guest-agent call (event 10802, a `VmLogon`/`VmLogoff` command) is a guest condition, not a host fault: `low`, with `vmCandidates` — the VMs the engine reports on that host. The event names no VM, so they are candidates to check, never the affected VM |
 | `storage_capacity_rca` | Storage problems ranked: critical blocker, low space, over-commit, inactive attached domains, storage events |
 | `vm_health_rca` | VM problems ranked: stuck, paused, image locked, HA VMs down, pending config restarts, VM events |
 | `datacenter_list` | Data centers, status, compatibility version |

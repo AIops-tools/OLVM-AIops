@@ -54,9 +54,11 @@ class Engine:
             self.routes[f"/datacenters/{dc}/storagedomains"]["storage_domain"].append(
                 {"id": sd["id"], "status": dc_status})
         self.health = health
+        self.calls = []
 
     def get(self, path, params=None):
         params = params or {}
+        self.calls.append(path)
         if path != "/events":
             value = self.routes[path]
             if isinstance(value, Exception):
@@ -302,3 +304,158 @@ def test_a_data_center_status_alert_counts_while_the_data_center_is_not_up():
     engine = Engine(events, datacenters=[{"id": "dc1", "name": "dc1", "status": "not_operational"}])
     [f] = eh.engine_health_rca(engine)["findings"]
     assert f["severity"] == "high" and "Storage Pool Manager" in f["cause"]
+
+
+# ─── production feedback (#1): a guest call failing is not a host fault ─────
+
+
+def vdsm_failure(index, command, message, minutes_ago=10, hid="h1"):
+    """AuditLogType.VDS_BROKER_COMMAND_FAILURE: "VDSM ${VdsName} command ${CommandName}
+    failed: ${message}" — a wrapper whose real subject is the command that failed."""
+    return ev(index, dg.VDSM_COMMAND_FAILURE, "error", minutes_ago,
+              f"VDSM {hid} command {command} failed: {message}", host=hid)
+
+
+def on_host(vid, hid="h1", status="up"):
+    return {**vm(status, vid), "host": {"id": hid, "name": hid}}
+
+
+def test_a_guest_agent_command_failure_is_not_reported_as_a_host_fault():
+    """Production feedback: 10802 "VmLogonVDS failed: Guest agent non-responsive" ranked
+    two hosts high while both were up, ok, and needed nothing."""
+    engine = Engine([vdsm_failure(1, "VmLogonVDS", "Guest agent non-responsive")],
+                    hosts=[host("up")], vms=[on_host("vm1")])
+    out = dg.host_health_rca(engine)
+    [f] = out["findings"]
+    assert f["severity"] == "low" and out["healthy"] is True
+    assert "guest agent" in f["cause"] and "not a fault of the host" in f["cause"]
+    assert f["vmCandidates"]["vms"] == [{"id": "vm1", "name": "vm1", "status": "up"}]
+    assert f["vmCandidates"]["returned"] == 1 and f["vmCandidates"]["total"] == 1
+    assert f["vmCandidates"]["truncated"] is False and f["vmCandidates"]["error"] is None
+
+
+def test_vm_candidates_are_the_vms_on_that_host_only_and_are_capped():
+    vms = [on_host(f"vm{i}") for i in range(dg.VM_CANDIDATE_LIMIT + 3)]
+    vms.append(on_host("elsewhere", "h2"))
+    engine = Engine([vdsm_failure(1, "VmLogoffVDS", "Guest agent non-responsive")],
+                    hosts=[host("up", "h1"), host("up", "h2")], vms=vms)
+    [f] = [f for f in dg.host_health_rca(engine)["findings"] if "vmCandidates" in f]
+    candidates = f["vmCandidates"]
+    assert candidates["returned"] == dg.VM_CANDIDATE_LIMIT == candidates["limit"]
+    assert candidates["total"] == dg.VM_CANDIDATE_LIMIT + 3 and candidates["truncated"] is True
+    assert all(c["id"] != "elsewhere" for c in candidates["vms"])
+
+
+def test_a_host_running_nothing_gets_an_empty_candidate_list_not_a_guess():
+    engine = Engine([vdsm_failure(1, "VmLogonVDS", "Guest agent non-responsive")],
+                    hosts=[host("up")], vms=[on_host("vm1", "h2")])
+    [f] = dg.host_health_rca(engine)["findings"]
+    assert f["vmCandidates"]["vms"] == [] and f["vmCandidates"]["total"] == 0
+    assert f["vmCandidates"]["error"] is None
+
+
+def test_unreadable_vms_say_so_instead_of_looking_like_no_candidates():
+    engine = Engine([vdsm_failure(1, "VmLogonVDS", "Guest agent non-responsive")],
+                    hosts=[host("up")])
+    engine.routes["/vms"] = OlvmApiError("403 Forbidden: the account cannot read VMs")
+    [f] = dg.host_health_rca(engine)["findings"]
+    assert f["vmCandidates"]["vms"] == [] and f["vmCandidates"]["total"] is None
+    assert "403" in f["vmCandidates"]["error"]
+
+
+def test_the_candidate_vms_are_read_once_for_the_whole_diagnosis():
+    engine = Engine([vdsm_failure(1, "VmLogonVDS", "Guest agent non-responsive", hid="h1"),
+                     vdsm_failure(2, "VmLogonVDS", "Guest agent non-responsive", hid="h2")],
+                    hosts=[host("up", "h1"), host("up", "h2")], vms=[on_host("vm1")])
+    out = dg.host_health_rca(engine)
+    assert len([f for f in out["findings"] if "vmCandidates" in f]) == 2
+    assert engine.calls.count("/vms") == 1
+
+
+def test_a_vdsm_command_failure_that_is_not_a_guest_call_stays_a_host_finding():
+    engine = Engine([vdsm_failure(1, "SpmStatusVDS", "Connection timeout")],
+                    hosts=[host("up")], vms=[on_host("vm1")])
+    [f] = dg.host_health_rca(engine)["findings"]
+    assert f["severity"] == "high" and "vmCandidates" not in f
+
+
+def test_a_guest_agent_failure_is_not_superseded_by_a_later_host_recovery():
+    events = [vdsm_failure(1, "VmLogonVDS", "Guest agent non-responsive", minutes_ago=60),
+              ev(2, 13, "normal", 30, "Status of host h1 was set to Up.", host="h1")]
+    [f] = dg.host_health_rca(Engine(events, hosts=[host("up")]))["findings"]
+    assert f["severity"] == "low" and "guest agent" in f["cause"]
+
+
+def test_only_a_vdsm_command_failure_is_read_as_a_guest_call():
+    """Other events quote failed commands too; the guest rule keys on code 10802."""
+    engine = Engine([ev(1, 519, "error", 10,
+                        "VDSM h1 command VmLogonVDS failed: Guest agent non-responsive",
+                        host="h1")], hosts=[host("up")], vms=[on_host("vm1")])
+    [f] = dg.host_health_rca(engine)["findings"]
+    assert f["severity"] == "high" and "vmCandidates" not in f
+
+
+def test_a_cut_vm_scan_says_the_candidate_list_is_a_lower_bound(monkeypatch):
+    """A candidate list read from a truncated scan must not look complete."""
+    monkeypatch.setattr(dg.u, "ANALYSIS_LIST_LIMIT", 2)
+    engine = Engine([vdsm_failure(1, "VmLogonVDS", "Guest agent non-responsive")],
+                    hosts=[host("up")], vms=[on_host(f"vm{i}") for i in range(3)])
+    [f] = [f for f in dg.host_health_rca(engine)["findings"] if "vmCandidates" in f]
+    assert f["vmCandidates"]["scanTruncated"] is True
+    assert f["vmCandidates"]["total"] == 2  # a lower bound: the scan stopped at the limit
+
+
+def test_a_complete_vm_scan_is_not_flagged_as_cut():
+    engine = Engine([vdsm_failure(1, "VmLogonVDS", "Guest agent non-responsive")],
+                    hosts=[host("up")], vms=[on_host("vm1")])
+    [f] = dg.host_health_rca(engine)["findings"]
+    assert f["vmCandidates"]["scanTruncated"] is False
+
+
+def test_a_real_vdsm_failure_is_not_collapsed_into_a_newer_guest_agent_one():
+    """Review: 10802 wraps every vdsm command, so grouping by code alone let the newest
+    VmLogonVDS classify an SpmStatusVDS failure — and its text vanished from the payload."""
+    events = [vdsm_failure(1, "SpmStatusVDS", "Connection refused", minutes_ago=60),
+              vdsm_failure(2, "VmLogonVDS", "Guest agent non-responsive", minutes_ago=5)]
+    out = dg.host_health_rca(Engine(events, hosts=[host("up")], vms=[on_host("vm1")]))
+    by_command = {f["signal"].split("command ")[1].split(" ")[0]: f for f in out["findings"]}
+    assert by_command["SpmStatusVDS"]["severity"] == "high"
+    assert by_command["VmLogonVDS"]["severity"] == "low"
+    assert out["healthy"] is False  # the real vdsm failure still decides this
+
+
+def test_a_guest_verb_that_failed_for_another_reason_stays_a_host_finding():
+    """Review: the command alone said "not a fault of the host" — but the same verb fails
+    with a vdsm transport error, which is exactly a fault of the host's link to vdsm."""
+    engine = Engine([vdsm_failure(1, "VmLogonVDS",
+                                  "Message timeout which can be caused by communication issues")],
+                    hosts=[host("up")], vms=[on_host("vm1")])
+    [f] = dg.host_health_rca(engine)["findings"]
+    assert f["severity"] == "high" and "vmCandidates" not in f
+
+
+def test_no_guest_finding_means_the_vm_list_is_never_read():
+    engine = Engine([ev(1, 12, "error", 10, "Host h1 is non responsive.", host="h1")],
+                    hosts=[host("non_responsive")], vms=[on_host("vm1")])
+    dg.host_health_rca(engine)
+    assert engine.calls.count("/vms") == 0
+
+
+def test_a_read_failure_without_a_message_still_explains_itself():
+    """`error` must never be an empty string: anything testing it for truth would read that
+    as "no error" and `total: 0` as "this host runs nothing"."""
+    engine = Engine([vdsm_failure(1, "VmLogonVDS", "Guest agent non-responsive")],
+                    hosts=[host("up")])
+    engine.routes["/vms"] = OlvmApiError("")
+    [f] = dg.host_health_rca(engine)["findings"]
+    assert f["vmCandidates"]["error"] == "OlvmApiError without a message"
+    assert f["vmCandidates"]["total"] is None
+
+
+def test_events_of_one_code_stay_one_finding_even_when_they_quote_commands():
+    """Only the vdsm wrapper code splits by command; other codes collapse per code as before."""
+    events = [ev(i, 519, "error", 60 - i * 10,
+                 f"Host installation failed: command Step{i}Cmd failed: not found", host="h1")
+              for i in (1, 2)]
+    [f] = dg.host_health_rca(Engine(events, hosts=[host("up")]))["findings"]
+    assert "(×2 in window)" in f["signal"] and f["severity"] == "high"

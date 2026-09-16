@@ -81,3 +81,67 @@ def _fixed_now(monkeypatch):
     import olvm_aiops.ops.diagnose as dg
 
     monkeypatch.setattr(dg.time, "time", lambda: 1789441200)  # 2026-09-15T03:00:00Z
+
+
+def test_host_health_prints_vm_candidates_as_candidates(monkeypatch):
+    """A guest-agent event names no VM: the CLI must not print a VM as the affected one."""
+    events = {"event": [{"index": "9", "code": "10802", "severity": "error",
+                         "time": 1789441200 * 1000 - 600_000,
+                         "description": "VDSM olvm-kvm1 command VmLogonVDS failed: "
+                                        "Guest agent non-responsive",
+                         "host": {"id": "h1", "name": "olvm-kvm1"}}]}
+    vms = {"vm": [{"id": "v1", "name": "app01", "status": "up", "host": {"id": "h1"}},
+                  {"id": "v2", "name": "db01", "status": "up", "host": {"id": "h1"}}]}
+    hosts = {"host": [{"id": "h1", "name": "olvm-kvm1", "status": "up"}]}
+    _wire(monkeypatch, {"/hosts": hosts, "/events": events, "/vms": vms})
+    r = runner.invoke(app, ["host", "health"])
+    assert r.exit_code == 0, r.output
+    out = " ".join(r.stdout.split())
+    assert "1. [low] olvm-kvm1: event 10802" in out
+    assert "VM candidates (not confirmed): app01, db01" in out
+    assert "No findings" not in out
+
+
+def test_host_health_says_when_the_candidate_vms_could_not_be_read(monkeypatch):
+    """An account that cannot read VMs must not make the host look like it runs none."""
+    from olvm_aiops.connection import OlvmApiError
+
+    events = {"event": [{"index": "9", "code": "10802", "severity": "error",
+                         "time": 1789441200 * 1000 - 600_000,
+                         "description": "VDSM olvm-kvm1 command VmLogonVDS failed: "
+                                        "Guest agent non-responsive",
+                         "host": {"id": "h1", "name": "olvm-kvm1"}}]}
+    routes = {"/hosts": {"host": [{"id": "h1", "name": "olvm-kvm1", "status": "up"}]},
+              "/events": events}
+    conn = _wire(monkeypatch, routes)
+
+    def get(path, params=None):
+        if path == "/vms":
+            raise OlvmApiError("403 Forbidden: query execution failed", status_code=403)
+        return routes[path]
+
+    conn.get.side_effect = get
+    r = runner.invoke(app, ["host", "health"])
+    assert r.exit_code == 0, r.output
+    out = " ".join(r.stdout.split())
+    assert "VM candidates: not readable" in out and "403" in out
+    assert "none on this host" not in out
+
+
+def test_host_health_says_when_the_candidate_scan_was_cut(monkeypatch):
+    import olvm_aiops.ops.diagnose as dg
+
+    monkeypatch.setattr(dg.u, "ANALYSIS_LIST_LIMIT", 2)
+    events = {"event": [{"index": "9", "code": "10802", "severity": "error",
+                         "time": 1789441200 * 1000 - 600_000,
+                         "description": "VDSM olvm-kvm1 command VmLogonVDS failed: "
+                                        "Guest agent non-responsive",
+                         "host": {"id": "h1", "name": "olvm-kvm1"}}]}
+    vms = {"vm": [{"id": f"v{i}", "name": f"app0{i}", "status": "up", "host": {"id": "h1"}}
+                  for i in range(3)]}
+    _wire(monkeypatch, {"/hosts": {"host": [{"id": "h1", "name": "olvm-kvm1", "status": "up"}]},
+                        "/events": events, "/vms": vms})
+    r = runner.invoke(app, ["host", "health"])
+    assert r.exit_code == 0, r.output
+    out = " ".join(r.stdout.split())
+    assert "PARTIAL: the VM scan was cut short" in out

@@ -1,5 +1,44 @@
 # Changelog
 
+## Unreleased
+
+First production feedback ([#1](https://github.com/AIops-tools/OLVM-AIops/issues/1)): a run
+against a small production engine with 8 hosts and an FC data domain.
+
+### Added
+- `host_health_rca` findings for a failed guest-agent call carry `vmCandidates`: the VMs the
+  engine reports on that host, as `{vms, returned, limit, truncated, total, scanTruncated,
+  error}`. The event names no VM, so these are candidates to check — the tool description, the
+  agent guardrails and the CLI ("VM candidates (not confirmed)") all say so. This adds one
+  `/vms` read to the diagnosis, made once and only when such a finding exists; a VM list that
+  cannot be read (a restricted account) is reported as `error` with `total: null`, never as a
+  host running nothing, and does not fail the diagnosis. `scanTruncated` says the VM scan
+  itself was cut at 1000, which makes `total` a lower bound.
+- The over-commit finding's signal carries actual use next to the commitment
+  (`committed 192.0% of capacity, in use 43.7% (56.3% free)`).
+
+### Fixed
+- A failed guest-agent call is no longer reported as a host fault. Event 10802
+  (`VDS_BROKER_COMMAND_FAILURE`) wraps one vdsm command, and the engine logs it against the
+  host that ran the call: `VmLogonVDS failed: Guest agent non-responsive` was ranked `high`
+  under the generic "The engine logged a problem for this host" while the host was `up`,
+  `externalStatus: ok`, with nothing pending. A `VmLogon` / `VmLogoff` command whose message
+  names the guest agent is now `low`, says the host itself is not at fault, and is not
+  superseded by the host's own recovery. The same command failing for another reason (a vdsm
+  transport timeout, say) is about the host's link to vdsm and stays a host finding, as does
+  every other vdsm command failure.
+- Event 10802 is now grouped per command instead of per code. It wraps every vdsm command, so
+  one group per host and code let the newest member classify the rest: a `SpmStatusVDS`
+  failure followed by a guest-agent one was reported as the guest-agent finding, and its text
+  appeared nowhere in the payload.
+- The over-commit cause no longer claims free space is "within the domain's own thresholds"
+  when the engine set none. It reports 0 for a domain with no low-space warning, and 0 can
+  never be crossed; the finding now says no check was made and points at the free space in
+  its own signal.
+- The over-commit finding now says which of two things it is: a planning limit while free
+  space holds, or — together with a low-space finding — a promise that cannot be kept.
+- The low-space action quoted a threshold the engine had not reported as `None GiB`.
+
 ## v0.1.0 — 2026-09-15
 
 First release of olvm-aiops: governed operations for Oracle Linux Virtualization

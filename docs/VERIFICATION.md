@@ -90,14 +90,60 @@ and are not exercised by a test:
 | Event 986 stays in the log after the data center comes up; code 13 "Status of host … set to Up" marks a host's recovery | superseded rules |
 | The host (vdsm) certificate lasts 5 years, the engine web certificate 398 days (lab: 2031-09-16 / 2027-10-18) | expiry comes from the engine's own certificate events, never a hard-coded lifetime |
 | Start action: 200 `complete` in 0.23 s, VM `up` after 72.7 s; `Correlation-Id` echoed into events | no writes until each can confirm its outcome |
+| Event 10802 wraps one vdsm command (`VDSM <host> command <Name>VDS failed: <message>`); a `logon` against a guest with no agent logs it with a `host` ref and **no `vm` key** | grouped per command, not per code; a guest-agent command whose message names the agent is diagnosed as a guest condition, with the host's VMs as candidates |
+
+## 2b. Production validation by a user (2026-09-15, issue #1)
+
+A user ran 0.1.0 against **a small production engine with 8 hosts, an FC data domain and a
+self-hosted storage domain** — installation, `init`, `doctor` and the read-only MCP tools all
+worked, and the results matched the engine's own API data. He reached the server over
+Streamable HTTP through a wrapper of his own; this package ships **stdio only**, and that
+wrapper is not part of what was verified.
+
+Beyond the lab this covers **multi-host** (all 8 hosts evaluated) and an **FC** data domain.
+It does not cover a read-only account, an engine without Keycloak, storage under pressure, or
+scale past the scan limits — and everything else in §3 is still open.
+
+He reported his run as observations, not as bugs ("the MCP behaved well in this environment").
+Two of them were defects all the same, and both are fixed:
+
+- **A guest problem reported as a host fault.** He saw event 10802
+  (`VDS_BROKER_COMMAND_FAILURE`, "VDSM *host* command VmLogonVDS failed: Guest agent
+  non-responsive") on two hosts that were `up`, `externalStatus: ok`, with no update or
+  reinstall pending; he did not quote a severity. Reproducing the event here showed what the
+  code did with it: `high`, under the generic "The engine logged a problem for this host" —
+  an `error`-severity code that is in no catalogue falls through to that. The event wraps a
+  single vdsm command and is logged against the host that ran it; a `VmLogon` / `VmLogoff`
+  call is about a VM's guest agent. Now `low`, with the host explicitly not at fault, and
+  never superseded by the host's own recovery.
+- **The affected VM cannot be named from the event** — the engine sends no `vm` reference at
+  all — and the user's judgement was that a single running VM on the host must stay an
+  inference.
+  Findings now carry `vmCandidates` (the VMs the engine reports on that host) as a candidate
+  list, labelled as not confirmed in the tool description, the guardrails and the CLI.
+
+The guest-agent defect was **reproduced and re-verified on the lab engine** (2026-09-16), not
+only in tests: `POST /ovirt-engine/api/vms/{id}/logon` against a guest without a guest agent makes the
+engine log exactly that event — `10802 error "VDSM olvm-kvm1 command VmLogonVDS failed: Guest
+agent non-responsive"`, with a `host` ref and **no `vm` key at all**. Against the same engine
+and the same event, the released 0.1.0 logic reported `1. [high] olvm-kvm1 … The engine logged
+a problem for this host`; the fix reports `1. [low]`, names the guest agent, lists
+`VM candidates (not confirmed): lab-vm1`, and leaves `healthy: true`. The host list is read
+once and only when such a finding exists — the traced run of `host health` on an engine with
+no guest-agent event sends no `/vms` request at all.
+
+One wording change from the same run: an FC domain at **192 % committed but 43.7 % used** was
+correctly `low` and `healthy: true`, but the finding did not distinguish a planning limit from
+current pressure. Its signal now carries actual use, and the cause says which of the two it is.
 
 ## 3. Live checklist — still open
 
 - [ ] An engine **without** Keycloak (`admin@internal`).
 - [ ] A **read-only** account (`ReadOnlyAdmin`): every read and diagnosis works; data-center
       storage views are readable (otherwise `statusErrors` must name the data center).
-- [ ] **Multi-host** cluster: SPM on one host, `host_health_rca` with one host `non_responsive`
-      (stop vdsmd) — the finding must carry `status_detail`.
+- [ ] **Multi-host** cluster — partly done: 8 hosts evaluated on a production engine (§2b).
+      Open: SPM on one host and one host `non_responsive` (stop vdsmd) — the finding must
+      carry `status_detail`.
 - [ ] **Storage faults**: fill a domain below `warning_low_space_indicator` and below
       `critical_space_action_blocker` (the engine must refuse a new disk — confirm the critical
       finding matches that refusal); put a domain in maintenance; block the NFS server so the
@@ -105,7 +151,9 @@ and are not exercised by a test:
 - [ ] **Paused VM**: exhaust a thin domain so a guest pauses on I/O error; `vm_health_rca` must
       rank it high and point at storage.
 - [ ] **Scale**: more than 1000 VMs or events — the truncation and scan flags must turn true.
-- [ ] iSCSI / FC / Gluster domains; self-hosted engine deployments; OLVM on Oracle Linux 8.
+- [ ] Storage back-ends and deployments — partly done: an **FC** data domain read correctly,
+      with a self-hosted storage domain in the same engine (§2b). Open: iSCSI and Gluster
+      domains, a self-hosted **engine** deployment as such, and OLVM on Oracle Linux 8.
 - [ ] An engine behind a directory profile (LDAP / AD user@profile).
 - [ ] An engine that has run for days: host and VM events on both sides of the 24 h window
       (`eventsOutsideWindow`), and a VM that failed, started and was shut down again.

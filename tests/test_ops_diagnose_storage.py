@@ -108,3 +108,61 @@ def test_findings_rank_worst_first():
     out = dg.storage_capacity_rca(_conn(mutate_global=bad))
     assert [(f["rank"], f["severity"]) for f in out["findings"]] == [(1, "critical"), (2, "medium")]
     assert "critical blocker" in out["findings"][0]["signal"]
+
+
+def test_overcommit_alone_reads_as_a_planning_limit_and_shows_actual_use():
+    """Production feedback: an FC domain 192 % committed but 43.7 % used. The severity was
+    right; what the finding did not say is that nothing is under pressure yet."""
+    def over(sd):
+        sd["available"], sd["used"] = str(563 * GIB), str(437 * GIB)
+        sd["committed"] = str(1920 * GIB)
+    out = dg.storage_capacity_rca(_conn(mutate_global=over))
+    f = _only(out)
+    assert f["severity"] == "low" and out["healthy"] is True
+    assert f["signal"] == "committed 192.0% of capacity, in use 43.7% (56.3% free)"
+    assert "planning limit, not current pressure" in f["cause"]
+    assert "above the thresholds the engine set" in f["cause"]
+    assert "before it reaches its low-space threshold (10% free)" in f["action"]
+
+
+def test_overcommit_with_low_space_says_the_promise_cannot_be_kept():
+    def over_and_low(sd):
+        sd["available"], sd["used"], sd["committed"] = str(40 * GIB), str(460 * GIB), str(600 * GIB)
+    out = dg.storage_capacity_rca(_conn(mutate_global=over_and_low))
+    f = next(f for f in out["findings"] if f["signal"].startswith("committed"))
+    assert f["severity"] == "medium" and "already low on space" in f["cause"]
+    assert "planning limit" not in f["cause"]
+
+
+@pytest.mark.parametrize("value", [None, "0"])
+def test_without_a_threshold_the_finding_does_not_claim_the_space_is_comfortable(value):
+    """Review: at 5 % free and no threshold, the cause said "still within the domain's own
+    thresholds" and the action said "no action" — a check that never happened. The engine
+    really does report 0 (live: the image repository), and 0 can never be crossed."""
+    def no_thresholds(sd):
+        sd["available"], sd["used"] = str(5 * GIB), str(95 * GIB)
+        sd["committed"] = str(150 * GIB)
+        sd["warning_low_space_indicator"] = value
+        sd["critical_space_action_blocker"] = value
+    f = _only(dg.storage_capacity_rca(_conn(mutate_global=no_thresholds)))
+    assert "5.0% free" in f["signal"]
+    assert "no check was made" in f["cause"] and "planning limit" not in f["cause"]
+    assert "No action" not in f["action"]
+    text = f["signal"] + f["cause"] + f["action"]
+    assert "None" not in text  # a missing threshold is never quoted back as "None GiB"
+
+
+def test_the_critical_blocker_is_named_when_the_engine_reports_it():
+    def lowish(sd):
+        sd["available"], sd["used"] = str(40 * GIB), str(460 * GIB)
+    f = _only(dg.storage_capacity_rca(_conn(mutate_global=lowish)))
+    assert "the critical blocker (5 GiB)" in f["action"]
+
+
+def test_a_low_space_warning_without_a_blocker_does_not_quote_a_none_threshold():
+    def no_blocker(sd):
+        sd["available"], sd["used"] = str(40 * GIB), str(460 * GIB)   # 8 % free < 10 %
+        sd["critical_space_action_blocker"] = None
+    f = _only(dg.storage_capacity_rca(_conn(mutate_global=no_blocker)))
+    assert f["severity"] == "medium" and "None" not in f["action"]
+    assert f["action"].endswith("before it reaches the critical blocker.")

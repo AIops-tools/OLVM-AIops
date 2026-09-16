@@ -117,8 +117,14 @@ def host_health_rca(events_limit: int = 200, events_window_hours: int = 24,
     warning-or-worse events that name a host. Each finding has `signal` (what was
     measured), `cause`, `action` and `rank`. Hosts that the engine is installing or
     rebooting are reported as in progress, not failed; alert 9000 (power management
-    not verifiable) is informational on hosts without fencing hardware. Report
-    findings in rank order and quote their signal.
+    not verifiable) is informational on hosts without fencing hardware. A failed
+    guest-agent call (event 10802, a command starting with VmLogon or VmLogoff whose
+    message names the guest agent) is a problem of a guest, not of the host that ran the
+    call: it is reported `low` and carries `vmCandidates`, the VMs the engine reports on
+    that host. The same command failing for another reason stays a host finding. The event names no
+    VM, so present those as candidates to check, never as the affected VM; if that
+    envelope has an `error`, or `scanTruncated` is true, say the candidate list is
+    incomplete. Report findings in rank order and quote their signal.
 
     Args:
         events_limit: Recent warning-or-worse events to correlate, 1-1000 (default 200).

@@ -18,9 +18,12 @@ certificate-expiry and no-backup alerts used to vanish from every diagnosis.
 
 from __future__ import annotations
 
+import re
 import time
+from collections.abc import Callable
 from typing import Any
 
+from olvm_aiops.connection import OlvmApiError
 from olvm_aiops.ops import _util as u
 from olvm_aiops.ops.activity import event_row
 from olvm_aiops.ops.inventory import host_row
@@ -45,6 +48,23 @@ IN_PROGRESS = {"installing", "reboot", "connecting", "initializing",
                "preparing_for_maintenance", "pending_approval", "installing_os", "unassigned"}
 
 POWER_MGMT_UNVERIFIED = 9000
+#: AuditLogType.VDS_BROKER_COMMAND_FAILURE — "VDSM ${VdsName} command ${CommandName} failed:
+#: ${message}". A wrapper around one vdsm call, logged against the host that ran it: the
+#: command name, not the host, says what the failure was about.
+VDSM_COMMAND_FAILURE = 10802
+#: vdsm verbs that call into a VM's guest agent (VDSCommandType VmLogon/VmLogoff, logged as
+#: VmLogonVDS/VmLogoffVDS). They fail when the guest agent is missing or not responding,
+#: which is a condition of that guest, not of the host.
+GUEST_AGENT_COMMANDS = ("VmLogon", "VmLogoff")
+#: The engine's message for the guest-agent condition ("Guest agent non-responsive", and the
+#: unhyphenated spelling). The same command can fail for a transport reason ("Message timeout
+#: which can be caused by communication issues"), which IS about the host's link to vdsm — so
+#: the command alone must not downgrade the finding.
+GUEST_AGENT_MESSAGE = "guest agent"
+#: Most candidate VMs listed on a guest-scoped finding.
+VM_CANDIDATE_LIMIT = 10
+
+_COMMAND_FAILED = re.compile(r"command (\w+) failed", re.IGNORECASE)
 #: ovirt-engine AuditLogType codes of the normal-severity events that record a recovery.
 HOST_STATUS_SET = 13           # VDS_DETECTED: "Status of host X was set to <status>."
 VM_STATUS_RESTORED = 163       # "VM X status was restored to <status>."
@@ -165,12 +185,21 @@ def _recovery_times(conn: Any, codes: set[int], cutoff_ms: int,
     return out
 
 
+def _event_subkey(raw: dict) -> str | None:
+    """What splits a code into separate conditions. Only event 10802 has one: it wraps any
+    vdsm command, so grouping the whole code together would let the newest member classify
+    a `SpmStatusVDS` failure as whatever the newest `VmLogonVDS` was."""
+    if u.as_int(raw.get("code")) != VDSM_COMMAND_FAILURE:
+        return None
+    return vdsm_command(raw.get("description"))
+
+
 def group_events(pairs: list[tuple[str, dict]]) -> list[dict]:
-    """One group per subject and event code: its count and its latest occurrence."""
-    groups: dict[tuple[str, int | None], dict] = {}
+    """One group per subject, event code and (for wrapper codes) command: count and latest."""
+    groups: dict[tuple[str, int | None, str | None], dict] = {}
     for subject, raw in pairs:
         happened = u.as_int(raw.get("time")) or 0
-        key = (subject, u.as_int(raw.get("code")))
+        key = (subject, u.as_int(raw.get("code")), _event_subkey(raw))
         group = groups.get(key)
         if group is None:
             groups[key] = {"subject": subject, "latest": raw, "time": happened, "count": 1}
@@ -194,6 +223,41 @@ def classify_event(ev: dict, subject: str) -> tuple[str, str, str]:
     return ("high" if ev["severity"] in ("error", "alert") else "medium",
             f"The engine logged a problem for this {subject}.",
             "Read the event in context (event_list) and the engine and vdsm logs.")
+
+
+def vdsm_command(description: Any) -> str | None:
+    """The command name out of a VDS_BROKER_COMMAND_FAILURE description, if it is there."""
+    match = _COMMAND_FAILED.search(str(description or ""))
+    return match.group(1) if match else None
+
+
+def guest_agent_failure(ev: dict) -> tuple[str, str, str] | None:
+    """(severity, cause, action) when this event is a guest-agent call that failed.
+
+    Live production feedback (#1): 10802 "VmLogonVDS failed: Guest agent non-responsive"
+    was ranked ``high`` against hosts that were up, ``externalStatus: ok`` and needed
+    neither an update nor a reinstall — the event is about a guest, and the engine
+    attributes it to the vdsm host only because that is where the call ran.
+    """
+    if ev["code"] != VDSM_COMMAND_FAILURE:
+        return None
+    command = vdsm_command(ev["description"])
+    if command is None or not command.startswith(GUEST_AGENT_COMMANDS):
+        return None
+    if GUEST_AGENT_MESSAGE not in str(ev["description"] or "").lower().replace("-", " "):
+        # A guest-agent verb that failed for another reason (a vdsm transport timeout, say)
+        # is not evidence that the host is fine; leave it on the normal host path.
+        return None
+    return ("low",
+            f"The vdsm command {command} failed on this host, and the engine's message names "
+            "the guest agent. It is a call into a VM's guest agent, so this reports an agent "
+            "that is missing or not responding — not a fault of the host, whose own state is "
+            "reported by its status, external status and flags. A VM without a responsive "
+            "guest agent still runs, but reports no in-guest data and cannot be logged into "
+            "from the console.",
+            "Check the guest agent (ovirt-guest-agent / qemu-guest-agent) inside the VM. "
+            "The event names no VM, so vmCandidates lists the VMs the engine reports on "
+            "this host: candidates to check, not a confirmed mapping.")
 
 
 def _ranked(findings: list[dict], subject_key: str) -> list[dict]:
@@ -267,8 +331,44 @@ def _flag_findings(host: dict) -> list[dict]:
     return out
 
 
+def vm_candidates(conn: Any) -> Callable[[str], dict]:
+    """A lookup of the VMs the engine reports on a host, read once and reused.
+
+    A failed read is reported as ``error`` with ``total: null``: "the VMs could not be
+    read" must not look like "this host runs nothing". host_health_rca does not otherwise
+    need the VM list, so a missing permission narrows one finding instead of failing the
+    whole diagnosis. ``scanTruncated`` says the VM scan itself was cut, which makes both
+    the list and ``total`` a lower bound — a candidate list that was cut must say so.
+    """
+    cache: dict[str, Any] = {}
+
+    def lookup(host_id: str) -> dict:
+        if not cache:
+            try:
+                rows, cut = u.fetch_page(conn, "/vms", "vm", u.ANALYSIS_LIST_LIMIT)
+                cache.update(rows=[vm_row(v) for v in rows], error=None, cut=cut)
+            except (OlvmApiError, ValueError) as exc:
+                # Engine text reaches the model: sanitise it like every other engine string.
+                # An exception with no message still has to say something — an empty string
+                # would read as "no error" to anything testing this field for truth.
+                reason = u.text(str(exc), 300) or f"{type(exc).__name__} without a message"
+                cache.update(rows=[], error=reason, cut=False)
+        on_host = sorted(({"id": v["id"], "name": v["name"], "status": v["status"]}
+                          for v in cache["rows"] if v["hostId"] == host_id),
+                         key=lambda v: v["name"] or "")
+        shown = on_host[:VM_CANDIDATE_LIMIT]
+        return {**u.envelope("vms", shown, VM_CANDIDATE_LIMIT,
+                             len(on_host) > VM_CANDIDATE_LIMIT),
+                "total": None if cache["error"] is not None else len(on_host),
+                "scanTruncated": cache["cut"],
+                "error": cache["error"]}
+
+    return lookup
+
+
 def _event_findings(host_by_id: dict[str, dict], raw_events: list[dict],
-                    set_up_at: dict[str, list[int]]) -> list[dict]:
+                    set_up_at: dict[str, list[int]],
+                    candidates: Callable[[str], dict]) -> list[dict]:
     """Findings for events about a host alone, one per host and event code.
 
     An event that also names a VM or a storage domain is about that object; the host
@@ -295,6 +395,13 @@ def _event_findings(host_by_id: dict[str, dict], raw_events: list[dict],
                                 "Configure power management if HA VMs depend on this host; "
                                 "otherwise this alert is informational."))
             continue
+        guest = guest_agent_failure(ev)
+        if guest is not None:
+            # Checked before the supersede rule: the host never went down, so "the engine
+            # set it back to Up" says nothing about the guest agent.
+            out.append({**_finding(guest[0], host, signal, *guest[1:]),
+                        "vmCandidates": candidates(host["id"])})
+            continue
         recovered = any(t > group["time"] for t in set_up_at.get(host["id"], []))
         if ev["code"] not in KNOWN_EVENTS and host["status"] == "up" and recovered:
             out.append(_finding("info", host, signal,
@@ -302,8 +409,8 @@ def _event_findings(host_by_id: dict[str, dict], raw_events: list[dict],
                                 "and it is up now.",
                                 "No action unless it recurs; the event is kept for context."))
             continue
-        out.append(_finding(*classify_event(ev, "host")[:1], host, signal,
-                            *classify_event(ev, "host")[1:]))
+        severity, cause, action = classify_event(ev, "host")
+        out.append(_finding(severity, host, signal, cause, action))
     return out
 
 
@@ -316,6 +423,11 @@ def host_health_rca(conn: Any, events_limit: int = 200,
     (repeats collapsed). A problem event is superseded when the engine set the host
     to Up afterwards and it is up now; certificate and time-drift alerts are standing
     conditions and are never superseded.
+
+    A vdsm guest-agent call that failed (event 10802 VmLogonVDS / VmLogoffVDS) is a
+    condition of a guest, not of the host that ran the call: it is reported ``low`` and
+    carries ``vmCandidates``, the VMs the engine reports on that host. The event names
+    no VM, so those are candidates to check, never a confirmed mapping.
     """
     cutoff_ms = _window_cutoff_ms(events_window_hours)
     hosts_scan, hosts_truncated = u.fetch_page(conn, "/hosts", "host", u.ANALYSIS_LIST_LIMIT)
@@ -329,7 +441,7 @@ def host_health_rca(conn: Any, events_limit: int = 200,
         findings += _status_findings(host)
         findings += _external_findings(host)
         findings += _flag_findings(host)
-    findings += _event_findings(by_id, recent, set_up_at)
+    findings += _event_findings(by_id, recent, set_up_at, vm_candidates(conn))
     ranked = _ranked(findings, "host")
 
     statuses: dict[str, int] = {}
@@ -401,22 +513,52 @@ def _sd_capacity_findings(sd: dict) -> list[dict]:
             "on this domain.",
             "Free space (remove unused disks or snapshots) or extend the domain now."))
     elif free_ratio is not None and warning is not None and free_ratio < warning:
+        # str(None) must never reach the text: an engine that reports no blocker would
+        # otherwise be quoted a threshold of "None GiB".
+        blocker_text = (f" the critical blocker ({blocker} GiB)" if blocker is not None
+                        else " the critical blocker")
         out.append(_sd_finding(
             "medium", sd, f"free {free_ratio:.2f}% < low-space warning {warning}%",
             "The domain is below the engine's low-space warning threshold.",
-            "Plan capacity before it reaches the critical blocker "
-            f"({blocker} GiB)."))
+            f"Plan capacity before it reaches{blocker_text}."))
     committed = sd["committedPctOfTotal"]
     if committed is not None and committed > 100 and total:
         # Over-commit is normal for thin, template-based deployments; it is only urgent
-        # once space is also running low.
+        # once space is also running low. Live production feedback (#1): a domain at 192 %
+        # committed and 43.7 % used read as a problem, so the finding now carries actual
+        # use and says which of the two it is.
         low_space = any("low-space warning" in f["signal"] or "critical blocker" in f["signal"]
                         for f in out)
-        out.append(_sd_finding(
-            "medium" if low_space else "low", sd, f"committed {committed}% of capacity",
-            "Thin-provisioned disks are promised more space than the domain holds; writes "
-            "can fail once they grow.",
-            "Watch actual usage, or extend the domain before guests fill their disks."))
+        used_pct, free_pct = sd["usedPct"], sd["freePct"]
+        actual = (f", in use {used_pct}% ({free_pct}% free)"
+                  if used_pct is not None and free_pct is not None else "")
+        promised = ("Thin-provisioned disks are promised more space than the domain holds. ")
+        # "Not under pressure" may only be claimed when a threshold was actually compared.
+        # The engine reports 0 for a domain with no low-space warning set (live: the image
+        # repository), and 0 can never be crossed — that is not a passed check.
+        checked = (warning is not None and warning > 0) or (blocker is not None and blocker > 0)
+        if low_space:
+            cause = (promised[:-2] + ", and the domain is already low on space: the promise "
+                     "cannot be kept, and a guest that grows into it now can fail its writes.")
+            action = ("Free space or extend the domain: over-commit is only safe while free "
+                      "space lasts.")
+        elif checked:
+            cause = (promised + "Free space is still above the thresholds the engine set for "
+                     "this domain, so this is a planning limit, not current pressure: writes "
+                     "fail only once guests grow into what was promised.")
+            named = (f" ({warning}% free)" if warning is not None and warning > 0
+                     else f" ({blocker} GiB free)")
+            action = ("No action while free space holds. Track how fast actual use grows and "
+                      f"extend the domain before it reaches its low-space threshold{named}.")
+        else:
+            cause = (promised + "The engine reports no low-space threshold for this domain "
+                     "(warning_low_space_indicator and critical_space_action_blocker are 0 or "
+                     "absent), so no check was made and this diagnosis cannot say whether the "
+                     "space left is comfortable — read the free space in the signal.")
+            action = ("Set the domain's low-space warning and critical blocker in the engine "
+                      "so it can raise one, and track how fast actual use grows.")
+        out.append(_sd_finding("medium" if low_space else "low", sd,
+                               f"committed {committed}% of capacity{actual}", cause, action))
     external = sd["externalStatus"]
     if external in ("error", "failure"):
         out.append(_sd_finding("high", sd, f"external_status={external}",

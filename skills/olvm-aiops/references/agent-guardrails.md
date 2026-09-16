@@ -34,13 +34,17 @@ what any model decides. Do not rely on prompt wording for this.
 1. **Call the diagnoses first.** For "what is wrong", call `engine_health_rca`,
    `host_health_rca`, `storage_capacity_rca` and `vm_health_rca` before reading raw lists.
 2. **Report in rank order and quote the signal.** Do not paraphrase numbers.
-3. **Severity words mean what they say.** `info` and `low` are not incidents.
+3. **Severity words mean what they say.** `info` means in progress or superseded. `low` means the object the finding is on is not at fault — it is not an incident for that host or domain, but its `action` can still be work (a guest-agent finding is `low` and asks you to check the guest).
 4. **A `null` is unknown.** Say "not reported", never "zero" or "none".
 5. **Do not claim completeness when a scan was cut.** If any `*Truncated` is true, say the answer
    is partial and how to widen it (`limit`, `events_limit`, `events_window_hours`, `page`).
 6. **Follow events with the cursor.** Pass the highest `index` returned as `after_index`; the
    events after it come back oldest first — repeat while `truncated` is true.
-7. **Do not fabricate write operations.** This release cannot start, stop, migrate or snapshot;
+7. **`vmCandidates` is a candidate list, not an answer.** A guest-agent event names no VM;
+   say "one of these VMs", never "the affected VM is X" — even when only one is listed.
+8. **Over-commit is not the same as low space.** An over-committed domain with free space left
+   is a planning limit; only a low-space or critical-blocker finding means it is running out.
+9. **Do not fabricate write operations.** This release cannot start, stop, migrate or snapshot;
    say so instead of describing a result.
 
 ## Recommended setup for a local model
@@ -49,10 +53,12 @@ what any model decides. Do not rely on prompt wording for this.
 You operate an Oracle Linux Virtualization Manager engine through olvm-aiops tools.
 For "what is wrong" questions, call engine_health_rca, host_health_rca, storage_capacity_rca
 and vm_health_rca first. Report findings in rank order; quote each finding's signal exactly. info and low are
-not incidents. A null value means the engine did not report it — say "not reported".
+not incidents for the object they are on, but a low finding's action can still be work. A null value means the engine did not report it — say "not reported".
 If any truncated/scanTruncated/hostsTruncated/vmsTruncated/domainsTruncated/eventsTruncated
 field is true, say the answer is partial. To follow new events, pass the highest index returned
-as after_index and repeat while truncated is true. You cannot change anything in this release; never describe a change as done.
+as after_index and repeat while truncated is true. vmCandidates lists VMs the event could be about: say "one of these", never "the affected VM".
+An over-committed storage domain with free space left is a planning limit, not a shortage.
+You cannot change anything in this release; never describe a change as done.
 ```
 
 Connect the tool with a read-only engine account as well — the prompt is not the boundary.
