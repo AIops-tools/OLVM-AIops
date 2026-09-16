@@ -171,3 +171,34 @@ def test_risk_level_agrees_with_read_write_docstring_tag():
 
     assert not untagged, f"tools missing a [READ]/[WRITE] docstring tag: {untagged}"
     assert not mismatched, f"risk_level disagrees with the docstring tag: {mismatched}"
+
+
+@pytest.mark.unit
+def test_a_manager_the_cli_dropped_is_still_closed_at_exit():
+    """cli/_common.get_connection builds a manager, returns only the connection and
+    drops the manager. A weak registry collects it, and the atexit hook then finds
+    nothing to close — silently, because the hook cannot tell "no managers" from
+    "no managers left". Pinned here so a teardown that ever does more than shut a
+    local socket still gets reached from the CLI path."""
+    import gc
+
+    import olvm_aiops.connection as conn_mod
+    from olvm_aiops.config import AppConfig
+
+    closed = {"n": 0}
+
+    class _Conn:
+        def close(self):
+            closed["n"] += 1
+
+    def like_get_connection():
+        mgr = conn_mod.ConnectionManager(AppConfig(targets=()))
+        conn = _Conn()
+        mgr._connections["engine1"] = conn
+        return conn  # the manager goes out of scope here, exactly as the CLI drops it
+
+    conn = like_get_connection()
+    gc.collect()
+    conn_mod._close_all_managers()
+    assert closed["n"] == 1, "a manager the CLI dropped was never closed at exit"
+    assert conn is not None
