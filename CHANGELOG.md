@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.2.0 — 2026-09-16
 
 First production feedback ([#1](https://github.com/AIops-tools/OLVM-AIops/issues/1)): a run
 against a small production engine with 8 hosts and an FC data domain.

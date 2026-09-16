@@ -1,6 +1,6 @@
 {
   "name": "@zw008/olvm-aiops",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Governed OLVM / oVirt 4.5 ops — 17 MCP tools: inventory, health, capacity, diagnosis; audited.",
   "private": true,
   "license": "MIT",
