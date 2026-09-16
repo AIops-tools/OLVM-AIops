@@ -527,20 +527,62 @@ def _sd_status_findings(sd: dict, view_timed_out: bool) -> list[dict]:
     return []
 
 
+def _crossable(threshold: int | None) -> bool:
+    """A threshold the engine can actually cross. It reports 0 for a domain with none set,
+    and ``free < 0`` / ``free% < 0`` is never true — 0 is "no threshold", not one that
+    keeps passing."""
+    return threshold is not None and threshold > 0
+
+
+def _sd_threshold_findings(sd: dict) -> list[dict]:
+    """The engine has no threshold here, so nothing can warn before the domain fills.
+
+    Silence would say the opposite. This states the gap and carries the measured free
+    space; it does not invent a threshold of its own — how full is too full is the
+    operator's policy, and this diagnosis has no way to read it.
+    """
+    warning, blocker = sd["warningLowSpacePct"], sd["criticalSpaceBlockerGiB"]
+    if _crossable(warning):
+        return []
+    free_pct = sd["freePct"]
+    measured = f"free {free_pct}%" if free_pct is not None else "free space not reported"
+    if _crossable(blocker):
+        return [_sd_finding(
+            "low", sd,
+            f"no low-space warning set; only the critical blocker ({blocker} GiB); {measured}",
+            "The domain has no low-space warning (warning_low_space_indicator is 0 or absent), "
+            f"so the first and only signal is the critical blocker at {blocker} GiB — the "
+            "point where the engine already refuses new disks and snapshots. There is no "
+            "earlier signal, for the engine or for this diagnosis.",
+            "Set warning_low_space_indicator on the domain so it warns before the blocker, "
+            "and watch the free space reported here meanwhile.")]
+    return [_sd_finding(
+        "low", sd, f"no low-space threshold set; {measured}",
+        "Neither warning_low_space_indicator nor critical_space_action_blocker is set on this "
+        "domain (the engine reports 0 for both), so neither the engine nor this diagnosis "
+        "can warn before it fills: no amount of free space will raise a finding here. How "
+        "full is too full is your policy, and it is not recorded on the domain.",
+        "Set warning_low_space_indicator and critical_space_action_blocker on the domain, and "
+        "judge the free space in this signal yourself until then.")]
+
+
 def _sd_capacity_findings(sd: dict) -> list[dict]:
-    out = []
+    out = _sd_threshold_findings(sd)
     free, total = sd["availableBytes"], sd["totalBytes"]
     blocker, warning = sd["criticalSpaceBlockerGiB"], sd["warningLowSpacePct"]
     # Compare the exact ratio: the rounded freePct turns 9.96 % into 10.0 % and misses a
     # 10 % threshold.
     free_ratio = free / total * 100 if free is not None and total else None
-    if free is not None and blocker is not None and free < blocker * GIB:
+    below_blocker = free is not None and blocker is not None and free < blocker * GIB
+    below_warning = (not below_blocker and free_ratio is not None and warning is not None
+                     and free_ratio < warning)
+    if below_blocker:
         out.append(_sd_finding(
             "critical", sd, f"free {free / GIB:.1f} GiB < critical blocker {blocker} GiB",
             "Below the critical-space blocker the engine refuses to create disks and snapshots "
             "on this domain.",
             "Free space (remove unused disks or snapshots) or extend the domain now."))
-    elif free_ratio is not None and warning is not None and free_ratio < warning:
+    if below_warning:
         # str(None) must never reach the text: an engine that reports no blocker would
         # otherwise be quoted a threshold of "None GiB".
         blocker_text = (f" the critical blocker ({blocker} GiB)" if blocker is not None
@@ -555,8 +597,9 @@ def _sd_capacity_findings(sd: dict) -> list[dict]:
         # once space is also running low. Live production feedback (#1): a domain at 192 %
         # committed and 43.7 % used read as a problem, so the finding now carries actual
         # use and says which of the two it is.
-        low_space = any("low-space warning" in f["signal"] or "critical blocker" in f["signal"]
-                        for f in out)
+        # Read from the conditions, never from the other findings' text: a finding that
+        # merely mentions the blocker (the missing-threshold one does) is not low space.
+        low_space = below_blocker or below_warning
         used_pct, free_pct = sd["usedPct"], sd["freePct"]
         actual = (f", in use {used_pct}% ({free_pct}% free)"
                   if used_pct is not None and free_pct is not None else "")
@@ -564,7 +607,7 @@ def _sd_capacity_findings(sd: dict) -> list[dict]:
         # "Not under pressure" may only be claimed when a threshold was actually compared.
         # The engine reports 0 for a domain with no low-space warning set (live: the image
         # repository), and 0 can never be crossed — that is not a passed check.
-        checked = (warning is not None and warning > 0) or (blocker is not None and blocker > 0)
+        checked = _crossable(warning) or _crossable(blocker)
         if low_space:
             cause = (promised[:-2] + ", and the domain is already low on space: the promise "
                      "cannot be kept, and a guest that grows into it now can fail its writes.")
@@ -574,7 +617,7 @@ def _sd_capacity_findings(sd: dict) -> list[dict]:
             cause = (promised + "Free space is still above what the engine set for this "
                      "domain, so this is a planning limit, not current pressure: writes fail "
                      "only once guests grow into what was promised.")
-            if warning is not None and warning > 0:
+            if _crossable(warning):
                 limit = f"its low-space threshold ({warning}% free)"
             else:
                 # Only the hard stop exists: say so, and do not call it an early warning.

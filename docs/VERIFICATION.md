@@ -132,6 +132,13 @@ a problem for this host`; the fix reports `1. [low]`, names the guest agent, lis
 once and only when such a finding exists — the traced run of `host health` on an engine with
 no guest-agent event sends no `/vms` request at all.
 
+Reviewing that wording surfaced a gap of its own, fixed after the release: a domain whose
+thresholds the engine reports as 0 produced **no space finding at any free space**. Verified
+live by clearing `warning_low_space_indicator` on the lab domain — the diagnosis then reports
+`low … no low-space warning set; only the critical blocker (5 GiB); free 86.5%` — and by
+restoring it, which returns the domain to no findings. The unattached image repository, which
+reports 0 for both thresholds, stays skipped.
+
 One wording change from the same run: an FC domain at **192 % committed but 43.7 % used** was
 correctly `low` and `healthy: true`, but the finding did not distinguish a planning limit from
 current pressure. Its signal now carries actual use, and the cause says which of the two it is.

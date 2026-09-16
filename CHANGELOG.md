@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `storage_capacity_rca` reports a domain the engine cannot warn about. The engine returns 0
+  for a threshold that is not set, and 0 can never be crossed, so a domain with
+  `warning_low_space_indicator: 0` produced no space finding at whatever free space — silence
+  that reads as "nothing to report". It is now a `low` finding carrying the measured free
+  space, in two forms: no threshold at all, or only the critical blocker (where the engine
+  already refuses new disks, so there is no earlier signal). It does not invent a threshold of
+  its own: how full is too full is the operator's policy and is not recorded on the domain.
+
+### Fixed
+- The over-commit severity is derived from the measured thresholds instead of from scanning
+  the other findings' text — a finding that merely names the critical blocker (the new one
+  does) was read as "the domain is low on space".
+
 ## v0.2.0 — 2026-09-16
 
 First production feedback ([#1](https://github.com/AIops-tools/OLVM-AIops/issues/1)): a run

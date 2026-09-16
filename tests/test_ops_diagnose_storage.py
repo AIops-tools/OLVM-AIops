@@ -43,6 +43,10 @@ def _conn(mutate_global=None, mutate_dc=None) -> MagicMock:
     return conn
 
 
+def _overcommit(out: dict) -> dict:
+    return next(f for f in out["findings"] if f["signal"].startswith("committed"))
+
+
 def _only(out: dict) -> dict:
     assert len(out["findings"]) == 1, out["findings"]
     return out["findings"][0]
@@ -144,7 +148,7 @@ def test_without_a_threshold_the_finding_does_not_claim_the_space_is_comfortable
         sd["committed"] = str(150 * GIB)
         sd["warning_low_space_indicator"] = value
         sd["critical_space_action_blocker"] = value
-    f = _only(dg.storage_capacity_rca(_conn(mutate_global=no_thresholds)))
+    f = _overcommit(dg.storage_capacity_rca(_conn(mutate_global=no_thresholds)))
     assert "5.0% free" in f["signal"]
     assert "no check was made" in f["cause"] and "planning limit" not in f["cause"]
     assert "No action" not in f["action"]
@@ -175,9 +179,61 @@ def test_with_only_a_critical_blocker_the_action_does_not_call_it_an_early_warni
         sd["available"], sd["used"] = str(50 * GIB), str(50 * GIB)
         sd["committed"] = str(150 * GIB)
         sd["warning_low_space_indicator"] = "0"
-    f = _only(dg.storage_capacity_rca(_conn(mutate_global=blocker_only)))
+    f = _overcommit(dg.storage_capacity_rca(_conn(mutate_global=blocker_only)))
     assert f["severity"] == "low"
     assert "the critical blocker (5 GiB free)" in f["action"]
     assert "low-space threshold" not in f["action"]
     assert "no earlier signal" in f["action"]
     assert "thresholds" not in f["cause"]  # exactly one comparison was made
+
+
+def test_a_domain_with_no_threshold_at_all_is_reported_instead_of_staying_silent():
+    """Without a crossable threshold neither the engine nor this diagnosis can warn before
+    the domain fills — and before this, a domain at 3 % free produced no finding at all."""
+    def no_thresholds(sd):
+        sd["available"], sd["used"] = str(3 * GIB), str(97 * GIB)
+        sd["warning_low_space_indicator"] = "0"
+        sd["critical_space_action_blocker"] = "0"
+    f = _only(dg.storage_capacity_rca(_conn(mutate_global=no_thresholds)))
+    assert f["severity"] == "low"
+    assert f["signal"] == "no low-space threshold set; free 3.0%"
+    assert "neither the engine nor this diagnosis can warn" in f["cause"]
+    assert "warning_low_space_indicator" in f["action"]
+    assert "critical_space_action_blocker" in f["action"]
+
+
+def test_a_blocker_without_a_warning_says_there_is_no_earlier_signal():
+    def blocker_only(sd):
+        sd["warning_low_space_indicator"] = "0"
+    f = _only(dg.storage_capacity_rca(_conn(mutate_global=blocker_only)))
+    assert f["severity"] == "low"
+    assert f["signal"] == "no low-space warning set; only the critical blocker (5 GiB); free 86.5%"
+    assert "already refuses" in f["cause"] and "no earlier signal" in f["cause"]
+    assert "warning_low_space_indicator" in f["action"]
+
+
+def test_a_domain_the_engine_can_warn_about_gets_no_threshold_finding():
+    """Positive control: the lab domain (10 % / 5 GiB) must not gain a finding."""
+    out = dg.storage_capacity_rca(_conn())
+    assert out["findings"] == [] and out["healthy"] is True
+
+
+def test_the_threshold_finding_does_not_replace_a_real_low_space_finding():
+    def low_and_no_warning(sd):
+        sd["available"], sd["used"] = str(3 * GIB), str(97 * GIB)   # 3 GiB < 5 GiB blocker
+        sd["warning_low_space_indicator"] = "0"
+    out = dg.storage_capacity_rca(_conn(mutate_global=low_and_no_warning))
+    severities = sorted(f["severity"] for f in out["findings"])
+    assert severities == ["critical", "low"] and out["healthy"] is False
+
+
+def test_a_finding_that_merely_names_the_blocker_is_not_read_as_low_space():
+    """The over-commit severity comes from the measured conditions, not from scanning the
+    other findings' text — the missing-threshold finding quotes the blocker in its signal."""
+    def blocker_only_overcommitted(sd):
+        sd["warning_low_space_indicator"] = "0"
+        sd["committed"] = str(150 * GIB)          # 86.5 % free: nowhere near the blocker
+    out = dg.storage_capacity_rca(_conn(mutate_global=blocker_only_overcommitted))
+    assert _overcommit(out)["severity"] == "low"
+    assert "already low on space" not in _overcommit(out)["cause"]
+    assert out["healthy"] is True
