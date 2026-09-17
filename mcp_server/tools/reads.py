@@ -124,7 +124,14 @@ def host_health_rca(events_limit: int = 200, events_window_hours: int = 24,
     that host. The same command failing for another reason stays a host finding. The event names no
     VM, so present those as candidates to check, never as the affected VM; if that
     envelope has an `error`, or `scanTruncated` is true, say the candidate list is
-    incomplete. Report findings in rank order and quote their signal.
+    incomplete. Every event-10802 finding reports one vdsm command rather than the host's
+    own state, so its `cause` names the command; do not restate it as "this host is
+    failing" unless the host's status, external status or flags say so. It also carries
+    `relatedVmEvents`: the VM-level failures the engine logged within `windowSeconds` on
+    this host, which is where the operation's own failure is recorded (vm_health_rca
+    reports that half). They are paired on time alone — say "possibly the same operation",
+    never that the host finding is about a named VM; an empty list means none was logged,
+    not that none was looked for. Report findings in rank order and quote their signal.
 
     Args:
         events_limit: Recent warning-or-worse events to correlate, 1-1000 (default 200).

@@ -66,6 +66,14 @@ GUEST_AGENT_COMMANDS = ("VmLogon", "VmLogoff")
 GUEST_AGENT_MESSAGE = "guest agent"
 #: Most candidate VMs listed on a guest-scoped finding.
 VM_CANDIDATE_LIMIT = 10
+#: How far apart the vdsm wrapper and the engine's own failure event for one operation can
+#: be and still be offered as the same incident. Both are written by a single engine command
+#: execution, seconds apart (live: the same second), and this leaves room for a slow vdsm
+#: call between them. It is a time proximity, not a link the engine draws — every candidate
+#: carries its own offset so a reader can judge the pairing.
+RELATED_EVENT_WINDOW_SEC = 60
+#: Most related VM events listed on a wrapper finding.
+RELATED_EVENT_LIMIT = 5
 
 _COMMAND_FAILED = re.compile(r"command (\w+) failed", re.IGNORECASE)
 #: ovirt-engine AuditLogType codes of the normal-severity events that record a recovery.
@@ -282,8 +290,79 @@ def guest_agent_failure(ev: dict) -> tuple[str, str, str] | None:
             "from the console.",
             "Check the guest agent (ovirt-guest-agent / qemu-guest-agent) inside the VM. "
             "The event names no VM, so vmCandidates lists the VMs the engine reports on "
-            "this host: candidates to check, not a confirmed mapping. For the full list on "
+            "this host and relatedVmEvents any VM-level failure logged beside this one: "
+            "both are candidates to check, not a confirmed mapping. For the full list on "
             "a busy host, read vm_list with search='host=<name>'.")
+
+
+def vdsm_command_failure(ev: dict) -> tuple[str, str, str] | None:
+    """(severity, cause, action) for a vdsm wrapper failure that is not the guest-agent one.
+
+    The catch-all cause — "The engine logged a problem for this host" — is wrong for every
+    10802. AuditLogMessages renders the event as "VDSM ${VdsName} command ${CommandName}
+    failed: ${message}": the subject is the command, and the host is only where the call
+    ran. Fixing the guest-agent condition alone (#1) left every other command in that
+    catch-all, which is how `UpdateVmInterfaceVDS failed: cannot modify MTU` — a rejected
+    vNIC change — was ranked as a high-severity fault of an otherwise healthy host.
+
+    The severity is not touched. The command name alone cannot say the host is fine:
+    "cannot modify MTU" may well be the host's own network, and nothing here measures
+    that. The guest-agent condition is downgraded only because its message names the
+    subject outright; everything else over-reports rather than guesses.
+    """
+    if ev["code"] != VDSM_COMMAND_FAILURE:
+        return None
+    command = vdsm_command(ev["description"])
+    if command is None or guest_agent_command(ev["description"]):
+        return None
+    severity = "high" if ev["severity"] in ("error", "alert") else "medium"
+    return (severity,
+            f"The vdsm command {command} failed on this host. The event reports that call, "
+            "not the host's own state — the engine logs it against the host because that is "
+            "where the call ran, and the host's own state is reported here by its status, "
+            "external status and flags. Whether the host is at fault depends on the message "
+            "the command failed with, which this diagnosis does not interpret, so the "
+            "event's own severity is kept rather than assumed harmless.",
+            f"Read the failing message in the signal above and find the operation {command} "
+            "belongs to (event_list, then the engine and vdsm logs). relatedVmEvents lists "
+            "the VM-level failures the engine logged beside this one: candidates for the "
+            "same operation, not a confirmed mapping.")
+
+
+def related_vm_events(raw_events: list[dict], host_id: str, wrapper_ms: int) -> dict:
+    """VM-naming problem events close enough to this wrapper to be the same operation.
+
+    Event 10802 carries no VM reference: the engine logs the vdsm call's failure against
+    the host that ran it and the operation's own failure against the VM (live: an
+    ``UpdateVmInterfaceVDS`` wrapper beside "Failed to update Interface nic1 for VM ...",
+    the same second). Nothing in either event points at the other, so each diagnosis
+    reported one half with no way to tell they were one incident. This pairs them on time
+    and host and says so: candidates, never a mapping.
+
+    An event naming a *different* host is excluded; one naming no host is kept — a missing
+    reference is not a contradicting one. The list comes out of the events already fetched,
+    so it costs no extra engine call, and it is returned even when empty: "the engine logged
+    no VM failure beside this" and "nothing looked" must not have the same shape.
+    """
+    found = []
+    for raw in raw_events:
+        vm_id, happened = u.ref_id(raw.get("vm")), u.as_int(raw.get("time"))
+        event_host = u.ref_id(raw.get("host"))
+        if vm_id is None or happened is None or abs(happened - wrapper_ms) \
+                > RELATED_EVENT_WINDOW_SEC * 1000:
+            continue
+        if event_host is not None and event_host != host_id:
+            continue
+        ev = event_row(raw)
+        found.append({"vmId": vm_id, "vm": (ev["vm"] or {}).get("name"), "code": ev["code"],
+                      "severity": ev["severity"], "time": ev["time"],
+                      "description": ev["description"],
+                      # Signed: negative means the engine logged the VM event first.
+                      "secondsApart": round((happened - wrapper_ms) / 1000)})
+    found.sort(key=lambda r: (abs(r["secondsApart"]), r["vm"] or "", r["vmId"]))
+    return {**u.envelope("events", found[:RELATED_EVENT_LIMIT], RELATED_EVENT_LIMIT,
+                         len(found) > RELATED_EVENT_LIMIT),
+            "windowSeconds": RELATED_EVENT_WINDOW_SEC}
 
 
 def _ranked(findings: list[dict], subject_key: str) -> list[dict]:
@@ -415,6 +494,11 @@ def _event_findings(host_by_id: dict[str, dict], raw_events: list[dict],
     for group in group_events(pairs):
         host, ev = host_by_id[group["subject"]], event_row(group["latest"])
         signal = event_signal(ev, group["count"])
+        # Every wrapper finding carries the related list, empty included: the engine logs
+        # the operation's own failure against the VM, and only this pairs the two halves.
+        wrapper = {"relatedVmEvents":
+                   related_vm_events(raw_events, host["id"], group["time"])} \
+            if ev["code"] == VDSM_COMMAND_FAILURE else {}
         if ev["code"] == POWER_MGMT_UNVERIFIED:
             out.append(_finding("low", host, signal,
                                 "Power management (fencing) is not configured or not reachable. "
@@ -428,17 +512,18 @@ def _event_findings(host_by_id: dict[str, dict], raw_events: list[dict],
             # Checked before the supersede rule: the host never went down, so "the engine
             # set it back to Up" says nothing about the guest agent.
             out.append({**_finding(guest[0], host, signal, *guest[1:]),
-                        "vmCandidates": candidates(host["id"])})
+                        "vmCandidates": candidates(host["id"]), **wrapper})
             continue
         recovered = any(t > group["time"] for t in set_up_at.get(host["id"], []))
         if ev["code"] not in KNOWN_EVENTS and host["status"] == "up" and recovered:
-            out.append(_finding("info", host, signal,
-                                "Superseded: the engine set this host to Up after this event, "
-                                "and it is up now.",
-                                "No action unless it recurs; the event is kept for context."))
+            out.append({**_finding("info", host, signal,
+                                    "Superseded: the engine set this host to Up after this "
+                                    "event, and it is up now.",
+                                    "No action unless it recurs; the event is kept for "
+                                    "context."), **wrapper})
             continue
-        severity, cause, action = classify_event(ev, "host")
-        out.append(_finding(severity, host, signal, cause, action))
+        severity, cause, action = vdsm_command_failure(ev) or classify_event(ev, "host")
+        out.append({**_finding(severity, host, signal, cause, action), **wrapper})
     return out
 
 

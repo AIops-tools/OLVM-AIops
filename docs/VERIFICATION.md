@@ -101,8 +101,8 @@ Streamable HTTP through a wrapper of his own; this package ships **stdio only**,
 wrapper is not part of what was verified.
 
 Beyond the lab this covers **multi-host** (all 8 hosts evaluated) and an **FC** data domain.
-It does not cover a read-only account, an engine without Keycloak, storage under pressure, or
-scale past the scan limits — and everything else in §3 is still open.
+It does not cover an engine without Keycloak, storage under pressure, or
+scale past the scan limits (a read-only account has since been covered — §2c) — and everything else in §3 is still open.
 
 He reported his run as observations, not as bugs ("the MCP behaved well in this environment").
 Two of them were defects all the same, and both are fixed:
@@ -143,11 +143,51 @@ One wording change from the same run: an FC domain at **192 % committed but 43.7
 correctly `low` and `healthy: true`, but the finding did not distinguish a planning limit from
 current pressure. Its signal now carries actual use, and the cause says which of the two it is.
 
+## 2c. Read-only account, by the same user (2026-09-17, issue #1)
+
+The one item §3 called untested and the README recommends. He ran **0.3.0 against the same
+production OLVM 4.5.5 engine under a separate account holding `ReadOnlyAdmin`**.
+
+What the role covered, measured rather than assumed:
+
+- `doctor` connected. `storage_domain_list` and `storage_capacity_rca` both read the
+  **data-center-scoped** storage view — HTTP 200, the two attached FC domains with
+  `statusSource: "dataCenter"` and a readable `active` status, `statusErrors` empty, neither
+  scan truncated. That was the stated pass criterion, and its failure mode was stated with it:
+  a domain coming back fine with an empty `statusErrors` under a role that cannot read the
+  data center would have been the bug, not the pass.
+- The unattached image repository was skipped by the capacity diagnosis, as designed.
+- `host_health_rca`, `engine_health_rca` and `vm_health_rca` completed: **8 hosts, 23 VMs**,
+  no truncated scans and no permission errors. Their `healthy: false` came from engine events,
+  not from failed reads.
+
+Cross-checked against the Administration Portal on the hosted-storage domain: the Portal shows
+199 GiB total, 382 GiB allocated, 87 GiB used, 112 GiB available; the diagnosis reports
+**192 % committed, 43.7 % used, 56.3 % free**, `low`, `healthy: true`. 382/199, 87/199 and
+112/199 are exactly those three percentages.
+
+**Not covered by this run**, and still open: both attached domains carry a 10 % low-space
+warning, so the 0.3.0 behaviour for an *attached* domain with no warning threshold was not
+exercised here (it is verified on the lab engine only, §2b).
+
+Two defects came out of what he reported, both fixed:
+
+- **A vdsm wrapper failure blamed on the host.** The Portal showed an `UpdateVmInterfaceVDS`
+  failure ("cannot modify MTU") on a host and a failed `nic1` update on a VM at the same
+  second. `host_health_rca` ranked the wrapper `high` under the same catch-all that produced
+  the original 0.2.0 report — fixing the guest-agent condition had left every other vdsm
+  command in it. The cause now names the command; the severity is **not** changed, because
+  "cannot modify MTU" can genuinely be the host's own network. The two halves of the incident
+  are now linked by `relatedVmEvents` (candidates, paired on time and host), which is the
+  correlation the Portal makes and neither diagnosis could.
+
 ## 3. Live checklist — still open
 
 - [ ] An engine **without** Keycloak (`admin@internal`).
-- [ ] A **read-only** account (`ReadOnlyAdmin`): every read and diagnosis works; data-center
-      storage views are readable (otherwise `statusErrors` must name the data center).
+- [x] A **read-only** account (`ReadOnlyAdmin`) — done on a production engine (§2c): every
+      read and all four diagnoses worked and the data-center storage views were readable.
+      Open under that role: nothing exercised a data center the role *cannot* read, so the
+      `statusErrors` path itself is still only covered by tests.
 - [ ] **Multi-host** cluster — partly done: 8 hosts evaluated on a production engine (§2b).
       Open: SPM on one host and one host `non_responsive` (stop vdsmd) — the finding must
       carry `status_detail`.

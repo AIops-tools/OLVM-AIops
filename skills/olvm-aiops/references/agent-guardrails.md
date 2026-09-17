@@ -21,7 +21,7 @@ what any model decides. Do not rely on prompt wording for this.
 | "Explain why something was flagged" | Every finding carries the measured `signal`, a `cause` and an `action`. |
 | "Don't treat a host being installed/rebooted as broken" | In-progress host states are `info` findings; alert 9000 (no fencing hardware) is `low`. |
 | "An old failed start doesn't mean the VM is broken now" | A VM event is superseded (`info`) when the VM started after it or the engine reported it back up; a host event when the engine set the host to Up afterwards; a data-center status event once the data center is up. Events older than `events_window_hours` (default 24) are not findings. |
-| "Don't blame the host for a storage or VM problem" | An event that names a VM or storage domain is not attributed to the host that ran it; repeats of one code on one host are one finding with a count. |
+| "Don't blame the host for a storage or VM problem" | An event that names a VM or storage domain is not attributed to the host that ran it; repeats of one code on one host are one finding with a count. Event 10802 names no VM but reports one vdsm command: its `cause` names that command rather than calling the host the problem (read from the engine's English message — a translated engine falls back to the plain host wording), and `relatedVmEvents` offers the VM-level failures the engine logged beside it. **It is not downgraded** — only the guest-agent condition is, because only its message names the subject; for every other command the event's severity is kept, so you still have to read which of the two it is. |
 | "A login page is not an empty inventory" | A non-JSON success response is an error, never an empty list. |
 | "Check the engine itself — certificates, backups" | `engine_health_rca` reads the health check and the clock, and reports the engine-wide alerts no other diagnosis sees. |
 | "Storage status: check the data center, not the global list" | Storage status is joined from each data center; `statusSource` says where it came from. |
@@ -44,9 +44,19 @@ what any model decides. Do not rely on prompt wording for this.
    say "one of these VMs", never "the affected VM is X" — even when only one is listed. It has
    no `limit` knob: for the whole list on a busy host read `vm_list` with `search="host=<name>"`,
    and if its `error` is set or `scanTruncated` is true, say the candidate list is incomplete.
-8. **Over-commit is not the same as low space.** An over-committed domain with free space left
+8. **`relatedVmEvents` is the other candidate list.** Event 10802 reports one vdsm command,
+   and the engine logs the operation's own failure against the VM as a separate event — so
+   `host_health_rca` and `vm_health_rca` each hold one half of the same incident. The field
+   pairs them on time and host only: say "possibly the same operation as", never "this host
+   finding is about VM X". An empty list means the engine logged no VM failure within
+   `windowSeconds`, not that none was looked for.
+9. **A 10802 finding is about the command, not the host.** Its `cause` names the command.
+   Do not report it as "this host is failing" unless the host's own status, external status
+   or flags say so — and do not report it as harmless either: only the guest-agent condition
+   is downgraded, because only its message names the subject.
+10. **Over-commit is not the same as low space.** An over-committed domain with free space left
    is a planning limit; only a low-space or critical-blocker finding means it is running out.
-9. **Do not fabricate write operations.** This release cannot start, stop, migrate or snapshot;
+11. **Do not fabricate write operations.** This release cannot start, stop, migrate or snapshot;
    say so instead of describing a result.
 
 ## Recommended setup for a local model
@@ -59,6 +69,8 @@ not incidents for the object they are on, but a low finding's action can still b
 If any truncated/scanTruncated/hostsTruncated/vmsTruncated/domainsTruncated/eventsTruncated
 field is true, say the answer is partial. To follow new events, pass the highest index returned
 as after_index and repeat while truncated is true. vmCandidates lists VMs the event could be about: say "one of these", never "the affected VM".
+A 10802 finding is about the vdsm command its cause names, not about the host; relatedVmEvents pairs it with VM-level
+failures the engine logged beside it on time alone: say "possibly the same operation", never "this host finding is about VM X".
 An over-committed storage domain with free space left is a planning limit, not a shortage.
 You cannot change anything in this release; never describe a change as done.
 ```

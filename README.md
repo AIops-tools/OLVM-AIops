@@ -207,9 +207,11 @@ same name. It records; it does not authorize.
 - **Verification status**: every read and all four diagnoses were run end to end
   against a live OLVM 4.5.5 engine with one KVM host, an NFS data domain and one VM.
   A user has since run the read-only tools against a small production engine with 8 hosts
-  and an FC data domain, and their results matched the engine's own API. Not yet verified:
-  iSCSI / Gluster domains, self-hosted engine deployments, engines without Keycloak,
-  read-only accounts, or engines past the scan limits. See
+  and an FC data domain, and their results matched the engine's own API — including a second
+  run under a `ReadOnlyAdmin` account, where every read and all four diagnoses worked and the
+  figures matched the Administration Portal. Not yet verified: iSCSI / Gluster domains,
+  self-hosted engine deployments, engines without Keycloak, or engines past the scan limits.
+  See
   [`docs/VERIFICATION.md`](docs/VERIFICATION.md).
 - **Engine only**: no direct host (vdsm) access. Hosts, storage and VMs are seen the
   way the engine sees them.

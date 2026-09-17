@@ -164,3 +164,39 @@ def test_host_health_says_how_many_candidates_it_did_not_print(monkeypatch):
     assert r.exit_code == 0, r.output
     out = " ".join(r.stdout.split())
     assert "VM candidates (not confirmed): app00, app01 (+3 more)" in out
+
+
+def test_host_health_prints_the_related_vm_event_as_a_candidate(monkeypatch):
+    """The wrapper names no VM. The CLI must show the VM-level failure the engine logged
+    beside it — and must not present it as the confirmed subject of the host finding."""
+    now_ms = 1789441200 * 1000
+    events = {"event": [
+        {"index": "9", "code": "10802", "severity": "error", "time": now_ms - 600_000,
+         "description": "VDSM olvm-kvm1 command UpdateVmInterfaceVDS failed: cannot modify MTU",
+         "host": {"id": "h1", "name": "olvm-kvm1"}},
+        {"index": "10", "code": "935", "severity": "error", "time": now_ms - 600_000,
+         "description": "Failed to update Interface nic1 (VirtIO) for VM app01.",
+         "vm": {"id": "v1", "name": "app01"}, "host": {"id": "h1", "name": "olvm-kvm1"}},
+    ]}
+    hosts = {"host": [{"id": "h1", "name": "olvm-kvm1", "status": "up"}]}
+    _wire(monkeypatch, {"/hosts": hosts, "/events": events, "/vms": {"vm": []}})
+    r = runner.invoke(app, ["host", "health"])
+    assert r.exit_code == 0, r.output
+    out = " ".join(r.stdout.split())
+    assert "UpdateVmInterfaceVDS" in out
+    assert "Related VM events (not confirmed): app01" in out and "event 935" in out
+
+
+def test_host_health_says_when_no_vm_event_was_logged_beside_the_wrapper(monkeypatch):
+    """Silence would read as "not looked at". The measurement is stated either way."""
+    events = {"event": [{"index": "9", "code": "10802", "severity": "error",
+                         "time": 1789441200 * 1000 - 600_000,
+                         "description": "VDSM olvm-kvm1 command SpmStatusVDS failed: "
+                                        "Connection refused",
+                         "host": {"id": "h1", "name": "olvm-kvm1"}}]}
+    hosts = {"host": [{"id": "h1", "name": "olvm-kvm1", "status": "up"}]}
+    _wire(monkeypatch, {"/hosts": hosts, "/events": events, "/vms": {"vm": []}})
+    r = runner.invoke(app, ["host", "health"])
+    assert r.exit_code == 0, r.output
+    out = " ".join(r.stdout.split())
+    assert "Related VM events (not confirmed): none logged within 60s" in out

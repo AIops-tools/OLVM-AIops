@@ -62,6 +62,28 @@ def print_findings(out: dict, subject_key: str) -> None:
                       f"{escape(f['signal'])}[/]")
         console.print(f"   cause: {escape(f['cause'])}\n   action: {escape(f['action'])}")
         _print_candidates(f.get("vmCandidates"))
+        _print_related_events(f.get("relatedVmEvents"))
+
+
+def _print_related_events(related: dict | None) -> None:
+    """The VM-level failures the engine logged beside a vdsm wrapper failure.
+
+    The wrapper carries no VM reference, so these are paired on time and host: printed as
+    candidates, and printed even when there are none — "the engine logged nothing beside
+    this" is a measurement, and silence would read as "this was not looked at".
+    """
+    if related is None:
+        return
+    rows = ", ".join(
+        f"{escape(r['vm'] or r['vmId'] or '-')} (event {r['code']}, {r['secondsApart']:+d}s)"
+        for r in related["events"])
+    none = f"none logged within {related['windowSeconds']}s"
+    console.print(f"   Related VM events (not confirmed): {rows or none}")
+    for r in related["events"]:
+        console.print(f"     {escape(r['description'])}")
+    if related["truncated"]:
+        console.print(f"   [yellow]PARTIAL: only the {related['limit']} nearest are shown; "
+                      "read event_list for the rest.[/]")
 
 
 def _print_candidates(candidates: dict | None) -> None:

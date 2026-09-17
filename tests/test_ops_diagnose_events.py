@@ -509,3 +509,145 @@ def test_candidates_are_listed_in_a_stable_order():
                     hosts=[host("up")], vms=vms)
     [f] = dg.host_health_rca(engine)["findings"]
     assert [v["name"] for v in f["vmCandidates"]["vms"]] == ["alpha", "bravo", "charlie"]
+
+
+# ─── production feedback (#1, ReadOnlyAdmin re-run): the wrapper's subject is the ──
+# ─── command, and the engine logs the operation's own failure beside it ───────────
+
+
+#: AuditLogType.NETWORK_UPDATE_VM_INTERFACE_FAILED — the engine's own failure event for
+#: the operation an UpdateVmInterfaceVDS wrapper is the low-level half of. The rule under
+#: test keys on "names a VM", not on this code: every VM-level failure pairs the same way.
+NIC_UPDATE_FAILED = 935
+
+
+def nic_update_failed(index, vid="vm1", minutes_ago=10, hid="h1"):
+    """AuditLogType.NETWORK_UPDATE_VM_INTERFACE_FAILED(935, ERROR): "Failed to update
+    Interface ${InterfaceName} (${InterfaceType}) for VM ${VmName}." — the engine's own
+    failure event for the operation the vdsm wrapper is the low-level half of."""
+    refs = {"vm": vid, **({"host": hid} if hid else {})}
+    return ev(index, NIC_UPDATE_FAILED, "error", minutes_ago,
+              f"Failed to update Interface nic1 (VirtIO) for VM {vid}. (User: admin)", **refs)
+
+
+def wrapper_finding(out):
+    [f] = [f for f in out["findings"] if "relatedVmEvents" in f]
+    return f
+
+
+def test_a_vdsm_wrapper_failure_names_the_command_instead_of_blaming_the_host():
+    """ReadOnlyAdmin re-run: `UpdateVmInterfaceVDS failed: cannot modify MTU` was ranked
+    high under the catch-all "The engine logged a problem for this host" — but the engine's
+    own template makes ${CommandName} the subject and logs it against the host only because
+    that is where the call ran. Fixing the guest-agent case left every other command in the
+    catch-all; this is the same defect, one instance further out."""
+    engine = Engine([vdsm_failure(1, "UpdateVmInterfaceVDS", "cannot modify MTU")],
+                    hosts=[host("up")], vms=[on_host("vm1")])
+    f = wrapper_finding(dg.host_health_rca(engine))
+    assert "UpdateVmInterfaceVDS" in f["cause"]
+    assert "problem for this host" not in f["cause"]
+
+
+def test_a_vdsm_wrapper_failure_is_not_downgraded_without_evidence():
+    """"cannot modify MTU" may well be the host's own network. The command name alone
+    cannot say the host is fine, and this line does not downgrade on a guess."""
+    engine = Engine([vdsm_failure(1, "UpdateVmInterfaceVDS", "cannot modify MTU")],
+                    hosts=[host("up")], vms=[on_host("vm1")])
+    out = dg.host_health_rca(engine)
+    assert wrapper_finding(out)["severity"] == "high" and out["healthy"] is False
+
+
+def test_a_wrapper_finding_offers_the_vm_failure_the_engine_logged_beside_it():
+    """Live: the Portal shows a host-side `UpdateVmInterfaceVDS` failure and a VM-side
+    `nic1` failure at the same second, and treats them as one incident. Two diagnoses
+    reported them independently with nothing linking them; the wrapper carries no VM
+    reference, so the pairing is offered as a candidate."""
+    engine = Engine([vdsm_failure(1, "UpdateVmInterfaceVDS", "cannot modify MTU"),
+                     nic_update_failed(2)],
+                    hosts=[host("up")], vms=[on_host("vm1")])
+    related = wrapper_finding(dg.host_health_rca(engine))["relatedVmEvents"]
+    assert related["returned"] == 1 and related["truncated"] is False
+    [row] = related["events"]
+    assert row["vmId"] == "vm1" and row["code"] == NIC_UPDATE_FAILED
+    assert row["secondsApart"] == 0 and "nic1" in row["description"]
+    assert related["windowSeconds"] == dg.RELATED_EVENT_WINDOW_SEC
+
+
+def test_the_related_list_says_it_is_a_candidate_not_a_mapping():
+    """A model reading one candidate must not name it as the affected VM — the same rule
+    vmCandidates already carries, for the same reason."""
+    engine = Engine([vdsm_failure(1, "UpdateVmInterfaceVDS", "cannot modify MTU"),
+                     nic_update_failed(2)],
+                    hosts=[host("up")], vms=[on_host("vm1")])
+    f = wrapper_finding(dg.host_health_rca(engine))
+    assert "candidate" in f["action"].lower() and "not" in f["action"].lower()
+
+
+def test_a_vm_event_on_another_host_is_not_offered_as_related():
+    engine = Engine([vdsm_failure(1, "UpdateVmInterfaceVDS", "cannot modify MTU", hid="h1"),
+                     nic_update_failed(2, hid="h2")],
+                    hosts=[host("up", "h1")], vms=[on_host("vm1")])
+    assert wrapper_finding(dg.host_health_rca(engine))["relatedVmEvents"]["events"] == []
+
+
+def test_a_vm_event_with_no_host_reference_is_still_offered():
+    """A missing reference is not a contradicting one: dropping it would make "the engine
+    did not say which host" look like "it said another host"."""
+    engine = Engine([vdsm_failure(1, "UpdateVmInterfaceVDS", "cannot modify MTU"),
+                     nic_update_failed(2, hid=None)],
+                    hosts=[host("up")], vms=[on_host("vm1")])
+    assert wrapper_finding(dg.host_health_rca(engine))["relatedVmEvents"]["returned"] == 1
+
+
+def test_a_vm_event_far_from_the_wrapper_is_not_offered_as_related():
+    engine = Engine([vdsm_failure(1, "UpdateVmInterfaceVDS", "cannot modify MTU",
+                                  minutes_ago=10),
+                     nic_update_failed(2, minutes_ago=180)],
+                    hosts=[host("up")], vms=[on_host("vm1")])
+    assert wrapper_finding(dg.host_health_rca(engine))["relatedVmEvents"]["events"] == []
+
+
+def test_the_related_list_is_capped_and_says_so():
+    events = [vdsm_failure(1, "UpdateVmInterfaceVDS", "cannot modify MTU")]
+    events += [nic_update_failed(i + 2, vid=f"vm{i}") for i in range(dg.RELATED_EVENT_LIMIT + 3)]
+    engine = Engine(events, hosts=[host("up")], vms=[on_host("vm1")])
+    related = wrapper_finding(dg.host_health_rca(engine))["relatedVmEvents"]
+    assert related["returned"] == dg.RELATED_EVENT_LIMIT and related["truncated"] is True
+
+
+def test_a_wrapper_with_no_vm_failure_beside_it_says_so_explicitly():
+    """An empty list is a measurement: the engine logged no VM-level failure near it.
+    Omitting the field would leave "nothing was found" and "nothing was looked for" the
+    same shape."""
+    engine = Engine([vdsm_failure(1, "UpdateVmInterfaceVDS", "cannot modify MTU")],
+                    hosts=[host("up")], vms=[on_host("vm1")])
+    related = wrapper_finding(dg.host_health_rca(engine))["relatedVmEvents"]
+    assert related["events"] == [] and related["returned"] == 0
+    assert related["truncated"] is False
+
+
+def test_a_host_finding_that_is_not_a_wrapper_carries_no_related_list():
+    engine = Engine([ev(1, 12, "error", 10, "Host h1 is non responsive.", host="h1")],
+                    hosts=[host("non_responsive")], vms=[on_host("vm1")])
+    assert all("relatedVmEvents" not in f for f in dg.host_health_rca(engine)["findings"])
+
+
+def test_a_guest_agent_finding_carries_both_candidate_fields():
+    """They answer different questions: which VMs run here at all, and which VM-level
+    failure the engine logged beside this one."""
+    engine = Engine([vdsm_failure(1, "VmLogonVDS", "Guest agent non-responsive"),
+                     nic_update_failed(2)],
+                    hosts=[host("up")], vms=[on_host("vm1")])
+    f = wrapper_finding(dg.host_health_rca(engine))
+    assert f["severity"] == "low"
+    assert f["vmCandidates"]["total"] == 1 and f["relatedVmEvents"]["returned"] == 1
+
+
+def test_a_wrapper_that_is_not_a_guest_call_still_reads_no_vm_list():
+    """The related list comes out of the events already fetched; it must not turn every
+    wrapper failure into an extra /vms read."""
+    engine = Engine([vdsm_failure(1, "UpdateVmInterfaceVDS", "cannot modify MTU"),
+                     nic_update_failed(2)],
+                    hosts=[host("up")], vms=[on_host("vm1")])
+    dg.host_health_rca(engine)
+    assert engine.calls.count("/vms") == 0

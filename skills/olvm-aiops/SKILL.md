@@ -26,7 +26,7 @@ compatibility: >
   Writes: none in this release. Every tool is a read or a diagnosis.
   Webhooks: none — no outbound network calls beyond the configured engine URL.
   SSL: verify_ssl defaults to true; set ca_file to the engine CA (https://<engine>/ovirt-engine/services/pki-resource?resource=ca-certificate&format=X509-PEM-CA) and use the engine's FQDN, whose certificate does not cover its IP.
-  Verification status: every read and all four diagnoses were run against a live Oracle Linux Virtualization Manager 4.5.5-1.73.el9 engine (Keycloak enabled) with one KVM host, an NFS data domain and a VM; tests use payloads captured from it. A user has since run the read-only tools against a small production engine with 8 hosts and an FC data domain, matching the engine's own API. Not yet verified on iSCSI/Gluster domains, on self-hosted engine deployments, on engines without Keycloak, under a read-only account, or past the scan limits (1000 objects). See docs/VERIFICATION.md.
+  Verification status: every read and all four diagnoses were run against a live Oracle Linux Virtualization Manager 4.5.5-1.73.el9 engine (Keycloak enabled) with one KVM host, an NFS data domain and a VM; tests use payloads captured from it. A user has since run the read-only tools against a small production engine with 8 hosts and an FC data domain, matching the engine's own API, and repeated it under a ReadOnlyAdmin account with every read and all four diagnoses working. Not yet verified on iSCSI/Gluster domains, on self-hosted engine deployments, on engines without Keycloak, or past the scan limits (1000 objects). See docs/VERIFICATION.md.
 ---
 
 # OLVM AIops
@@ -126,7 +126,7 @@ Needs `uvx` on `PATH`: the MCP server is fetched with uv, pinned to this release
 | Tool | What it answers |
 |---|---|
 | `engine_health_rca` | Engine problems ranked: health check, clock skew, engine/CA certificate expiry, engine backups, cluster HA reservation, data-center status |
-| `host_health_rca` | Host problems ranked: broken states with status detail, reinstall/update flags, host certificate expiry, host events. A failed guest-agent call (event 10802, a `VmLogon`/`VmLogoff` command) is a guest condition, not a host fault: `low`, with `vmCandidates` — the VMs the engine reports on that host. The event names no VM, so they are candidates to check, never the affected VM |
+| `host_health_rca` | Host problems ranked: broken states with status detail, reinstall/update flags, host certificate expiry, host events. A failed guest-agent call (event 10802, a `VmLogon`/`VmLogoff` command) is a guest condition, not a host fault: `low`, with `vmCandidates` — the VMs the engine reports on that host. Every 10802 finding reports one vdsm command (its `cause` names it, and only the guest-agent one is downgraded) and carries `relatedVmEvents`, the VM-level failures the engine logged beside it. Both lists are candidates to check, never the affected VM |
 | `storage_capacity_rca` | Storage problems ranked: critical blocker, low space, over-commit, inactive attached domains, storage events |
 | `vm_health_rca` | VM problems ranked: stuck, paused, image locked, HA VMs down, pending config restarts, VM events |
 | `datacenter_list` | Data centers, status, compatibility version |

@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased
+
+A second production run of the same engine ([#1](https://github.com/AIops-tools/OLVM-AIops/issues/1)),
+this one under a `ReadOnlyAdmin` account. The role covered every read and all four diagnoses;
+two defects came out of what it reported.
+
+### Added
+- Every event-10802 finding carries `relatedVmEvents`: the VM-naming warning-or-worse events
+  the engine logged within `windowSeconds` (60) on the same host, as `{events, returned, limit,
+  truncated, windowSeconds}` with a signed `secondsApart` on each. The engine records a vdsm
+  call's failure against the host and the operation's own failure against the VM as two
+  separate events, so `host_health_rca` and `vm_health_rca` each held one half of the same
+  incident with nothing linking them (live: an `UpdateVmInterfaceVDS` wrapper and a failed
+  `nic1` update, the same second). They are paired on time and host only, and labelled as
+  candidates in the tool description, the guardrails and the CLI — never as a mapping. An
+  event naming a different host is excluded; one naming no host is kept. The list comes from
+  the events already fetched, costs no extra read, and is returned even when empty.
+
+### Fixed
+- An event-10802 finding no longer says "The engine logged a problem for this host". The
+  engine renders the event as "VDSM ${VdsName} command ${CommandName} failed: ${message}" —
+  the command is the subject, and the host is where the call ran. Fixing only the guest-agent
+  condition in 0.2.0 left every other command in that catch-all, which is how
+  `UpdateVmInterfaceVDS failed: cannot modify MTU` — a rejected vNIC change — was reported as
+  a fault of an otherwise healthy host. The cause now names the command. **The severity is
+  unchanged**: "cannot modify MTU" may well be the host's own network, and only the
+  guest-agent condition has a message that names the subject outright.
+
 ## v0.3.0 — 2026-09-16
 
 ### Added
