@@ -651,3 +651,59 @@ def test_a_wrapper_that_is_not_a_guest_call_still_reads_no_vm_list():
                     hosts=[host("up")], vms=[on_host("vm1")])
     dg.host_health_rca(engine)
     assert engine.calls.count("/vms") == 0
+
+
+# ─── a failed login is an authentication event, not engine ill-health ───────
+
+USER_LOGIN_FAILED = 114            # AuditLogType.USER_VDC_LOGIN_FAILED(114, ERROR)
+USER_ACCOUNT_LOCKED = 160          # AuditLogType.USER_ACCOUNT_DISABLED_OR_LOCKED(160, ERROR)
+
+
+def login_failed(index, minutes_ago=10, who="admin@ovirt"):
+    """"User ${UserName} connecting from '${SourceIP}' failed to log in${LoginErrMsg}."
+    It names a user and nothing else, so it lands in the engine diagnosis."""
+    return ev(index, USER_LOGIN_FAILED, "error", minutes_ago,
+              f"User {who} connecting from '10.0.0.9' failed to log in: Cannot login. "
+              "User Password Is Invalid.", user=who)
+
+
+def test_a_mistyped_password_does_not_make_the_engine_unhealthy():
+    """ReadOnlyAdmin re-run: setting the account up produced two failed logins, and the
+    catch-all ranked them `high` with "The engine logged a problem for this engine" — so
+    any engine where anyone mistypes a password reports itself unhealthy for 24 hours."""
+    engine = Engine([login_failed(1), login_failed(2, minutes_ago=9)], hosts=[host("up")])
+    out = eh.engine_health_rca(engine)
+    [f] = out["findings"]
+    assert f["severity"] == "low" and out["healthy"] is True
+    assert "×2 in window" in f["signal"]
+
+
+def test_a_failed_login_says_what_it_is():
+    engine = Engine([login_failed(1)], hosts=[host("up")])
+    [f] = eh.engine_health_rca(engine)["findings"]
+    assert "problem for this engine" not in f["cause"]
+    assert "brute" in f["cause"].lower() or "repeat" in f["cause"].lower()
+
+
+def test_the_severity_of_a_failed_login_does_not_move_with_the_count():
+    """How many failures are too many is the operator's policy and the engine records no
+    threshold, so this diagnosis does not invent one: 1 and 50 report the same severity,
+    and the count is in the signal for the reader to judge."""
+    one = Engine([login_failed(1)], hosts=[host("up")])
+    many = Engine([login_failed(i) for i in range(50)], hosts=[host("up")])
+    [f_one] = eh.engine_health_rca(one)["findings"]
+    [f_many] = eh.engine_health_rca(many)["findings"]
+    assert f_one["severity"] == f_many["severity"] == "low"
+    assert "×50 in window" in f_many["signal"]
+
+
+def test_an_account_that_got_locked_is_still_reported_high():
+    """The downgrade above is only safe because the consequential outcome stays high — and
+    it is the one that would take this tool's own account offline."""
+    events = [ev(1, USER_ACCOUNT_LOCKED, "error", 10,
+                 "User svc-aiops cannot login, as it got disabled or locked. "
+                 "Please contact the system administrator.", user="svc-aiops")]
+    out = eh.engine_health_rca(Engine(events, hosts=[host("up")]))
+    [f] = out["findings"]
+    assert f["severity"] == "high" and out["healthy"] is False
+    assert "locked" in f["cause"].lower() and "problem for this engine" not in f["cause"]

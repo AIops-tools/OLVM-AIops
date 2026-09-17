@@ -25,6 +25,7 @@ what any model decides. Do not rely on prompt wording for this.
 | "A login page is not an empty inventory" | A non-JSON success response is an error, never an empty list. |
 | "Check the engine itself — certificates, backups" | `engine_health_rca` reads the health check and the clock, and reports the engine-wide alerts no other diagnosis sees. |
 | "Storage status: check the data center, not the global list" | Storage status is joined from each data center; `statusSource` says where it came from. |
+| "A failed login isn't an engine outage" | A user failing to log in (event 114) is `low` with the repeat count in the signal, so one mistyped password does not make `engine_health_rca` report the engine unhealthy; an account that is disabled or locked (160) is `high`. No count threshold is applied — how many failures matter is your judgement, and the engine records no threshold either. |
 | "Don't leak credentials" | Passwords are encrypted at rest, tokens stay in memory, SSO session ids in events are redacted. |
 | "Log what you did" | Every call — MCP and CLI — writes an audit row to `~/.olvm-aiops/audit.db`. |
 | "Don't loop on the same call" | The runaway guard trips a circuit breaker on tight repetition. |

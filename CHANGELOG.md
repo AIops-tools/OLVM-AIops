@@ -27,6 +27,15 @@ two defects came out of what it reported.
   a fault of an otherwise healthy host. The cause now names the command. **The severity is
   unchanged**: "cannot modify MTU" may well be the host's own network, and only the
   guest-agent condition has a message that names the subject outright.
+- A failed user login no longer makes the engine unhealthy. `USER_VDC_LOGIN_FAILED` (114) is
+  `AuditLogSeverity.ERROR` and was in no catalogue, so the two failed logins from setting up a
+  test account were ranked `high` with "The engine logged a problem for this engine" and
+  `healthy: false` — on any engine where anyone mistypes a password, for 24 hours. It is now
+  `low` and says what it is; the count stays in the signal and no count threshold is invented
+  (how many is too many is the operator's policy, and the engine records none).
+  `USER_ACCOUNT_DISABLED_OR_LOCKED` (160) gets its own `high` cause, so the consequential
+  outcome — an account that can no longer log in at all, possibly this tool's own — is still
+  reported as one.
 
 ## v0.3.0 — 2026-09-16
 

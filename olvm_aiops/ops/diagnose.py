@@ -129,6 +129,22 @@ KNOWN_EVENTS: dict[int, tuple[str, str, str]] = {
             "Add capacity to the cluster or reduce the resources reserved by HA VMs."),
     970: ("high", "The engine deactivated this storage domain because no host could see it.",
           "Restore the hosts' access to the storage server, then activate the domain."),
+    114: ("low", "A user failed to log in to the engine; the event names the account and the "
+                 "address it came from. This is an authentication event, not a fault of the "
+                 "engine, and the engine raises it for a mistyped password and for a "
+                 "brute-force attempt alike. What separates them is the repeat count in the "
+                 "signal and how many accounts and addresses are involved — this diagnosis "
+                 "reports the count and invents no threshold of its own, because how many "
+                 "failures are too many is the operator's policy and the engine records none.",
+          "Ignore a small number from an address you recognise. If the count is high, or the "
+          "account or address is unexpected, read event_list filtered to this code for the "
+          "full picture, and check for code 160 — the account being locked is reported "
+          "separately and is not low."),
+    160: ("high", "An account is disabled or locked, so it cannot log in at all. If it is the "
+                  "account this tool connects with, every call fails until it is unlocked — "
+                  "including the reads a diagnosis needs.",
+          "Unlock or re-enable the account in the Administration Portal, and find what locked "
+          "it (the failed logins before it, code 114)."),
     604: ("medium", "The host's clock drifts beyond the engine's allowed maximum; certificate "
                     "checks and scheduling can fail.",
           "Fix time synchronisation (chronyd) on the host."),

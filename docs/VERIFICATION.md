@@ -180,6 +180,13 @@ Two defects came out of what he reported, both fixed:
   "cannot modify MTU" can genuinely be the host's own network. The two halves of the incident
   are now linked by `relatedVmEvents` (candidates, paired on time and host), which is the
   correlation the Portal makes and neither diagnosis could.
+- **A failed login reported as engine ill-health.** He noted two failed logins while setting
+  the test account up. Measured against the fake engine: `USER_VDC_LOGIN_FAILED` (114, ERROR,
+  in no catalogue) produced `[high] engine … The engine logged a problem for this engine` and
+  `healthy: false` — so any engine where someone mistypes a password calls itself unhealthy
+  for 24 hours. Now `low`, with the repeat count in the signal and no invented count
+  threshold; `USER_ACCOUNT_DISABLED_OR_LOCKED` (160) gets its own `high` cause so the
+  consequential outcome is still reported as one.
 
 ## 3. Live checklist — still open
 
