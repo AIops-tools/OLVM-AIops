@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.4.0 — 2026-09-17
 
 A second production run of the same engine ([#1](https://github.com/AIops-tools/OLVM-AIops/issues/1)),
 this one under a `ReadOnlyAdmin` account. The role covered every read and all four diagnoses;
