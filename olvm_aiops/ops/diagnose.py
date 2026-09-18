@@ -52,6 +52,12 @@ POWER_MGMT_UNVERIFIED = 9000
 #: ${message}". A wrapper around one vdsm call, logged against the host that ran it: the
 #: command name, not the host, says what the failure was about.
 VDSM_COMMAND_FAILURE = 10802
+#: AuditLogType.IRS_BROKER_COMMAND_FAILURE — "VDSM command ${CommandName} failed: ${message}".
+#: The storage-pool (irsbroker) sibling of 10802: the same wrapper shape with no host in the
+#: template (live: every structured ref null). Its subject is the command, as with 10802.
+IRS_COMMAND_FAILURE = 10803
+#: Codes whose real subject is the vdsm command they wrap, so they group per command.
+WRAPPER_EVENTS = (VDSM_COMMAND_FAILURE, IRS_COMMAND_FAILURE)
 #: vdsm verbs that call into a VM's guest agent (VDSCommandType VmLogon/VmLogoff, logged as
 #: VmLogonVDS/VmLogoffVDS). They fail when the guest agent is missing or not responding,
 #: which is a condition of that guest, not of the host.
@@ -145,6 +151,18 @@ KNOWN_EVENTS: dict[int, tuple[str, str, str]] = {
                   "including the reads a diagnosis needs.",
           "Unlock or re-enable the account in the Administration Portal, and find what locked "
           "it (the failed logins before it, code 114)."),
+    # unlock_entity.sh INSERTs this row itself at severity 10 (alert) with a fixed message and
+    # no structured reference — the enum declares no severity, but the script ignores the
+    # enum. Live, the operator's own fix of a real lock came back as a high engine problem.
+    # It is a record of a manual repair, and its consequence is reported on its own: live,
+    # the image it unlocked then failed a delete (10803), which stays high.
+    2024: ("low", "Someone ran unlock_entity.sh by hand: a lock on the entity named in the "
+                  "event text was cleared directly in the engine database, not by the engine. "
+                  "This records a manual repair after an entity was left locked; it is not "
+                  "itself a fault of the engine.",
+           "Confirm the unlocked entity is consistent — an image or disk cleared this way can "
+           "still disagree with storage. Check the events after it (event_list) for failures "
+           "that name the same id, and find why the entity was left locked."),
     604: ("medium", "The host's clock drifts beyond the engine's allowed maximum; certificate "
                     "checks and scheduling can fail.",
           "Fix time synchronisation (chronyd) on the host."),
@@ -223,13 +241,16 @@ def _event_subkey(raw: dict) -> str | None:
     condition — the command, plus whether this is the guest-agent one — and it is read from
     the same text the classifier sees.
     """
-    if u.as_int(raw.get("code")) != VDSM_COMMAND_FAILURE:
+    code = u.as_int(raw.get("code"))
+    if code not in WRAPPER_EVENTS:
         return None
     description = event_row(raw)["description"]
     command = vdsm_command(description)
     if command is None:
         return None
-    return f"{command}|guest-agent" if guest_agent_command(description) else command
+    if code == VDSM_COMMAND_FAILURE and guest_agent_command(description):
+        return f"{command}|guest-agent"
+    return command
 
 
 def group_events(pairs: list[tuple[str, dict]]) -> list[dict]:
@@ -258,6 +279,19 @@ def classify_event(ev: dict, subject: str) -> tuple[str, str, str]:
     known = KNOWN_EVENTS.get(ev["code"])
     if known is not None:
         return known
+    command = vdsm_command(ev["description"]) if ev["code"] == IRS_COMMAND_FAILURE else None
+    if command is not None:
+        # Here rather than in one diagnosis: a 10803 row lands wherever its refs send it
+        # (live: none, so the engine diagnosis), and the catch-all is wrong in all of them.
+        # The severity is the event's own; only the cause is corrected.
+        return ("high" if ev["severity"] in ("error", "alert") else "medium",
+                f"The vdsm command {command} failed. This event comes from the storage-pool "
+                "broker and names no host: the command is its subject, and the message after "
+                "it says what failed. It reports that call, not a fault of the engine itself.",
+                f"Read the failing message in the signal and find the operation {command} "
+                "belongs to (event_list, then the engine and SPM host's vdsm logs). A failure "
+                "that names an image or disk id may follow a lock or an earlier failed "
+                "operation on the same id — check the events before it.")
     return ("high" if ev["severity"] in ("error", "alert") else "medium",
             f"The engine logged a problem for this {subject}.",
             "Read the event in context (event_list) and the engine and vdsm logs.")

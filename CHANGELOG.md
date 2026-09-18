@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.4.1 — 2026-09-19
+
+The reporter's raw event rows ([#1](https://github.com/AIops-tools/OLVM-AIops/issues/1))
+showed two more events falling through the catch-all that 0.4.0 fixed for 10802.
+
+### Fixed
+- Event 10803 (`IRS_BROKER_COMMAND_FAILURE`, "VDSM command ${CommandName} failed: ${message}")
+  now names its command instead of reporting "The engine logged a problem for this engine".
+  It is 10802's storage-pool sibling with no host in its template, so it lands in the engine
+  diagnosis (live: `DeleteImageGroupVDS failed: Image does not exist in domain`). Its severity
+  is unchanged. It is also grouped per command, so two different storage-pool failures are two
+  findings rather than the newest one classifying both — the grouping 0.2.0 needed for 10802.
+  The cause is corrected wherever the row's references send it.
+- Event 2024 (`unlock_entity.sh` run by hand) is no longer a high engine problem. The enum
+  declares no severity, but the script inserts its own audit row at severity 10 (`alert`),
+  with a fixed message and no structured reference. So an operator's manual repair of a real
+  lock was reported as a fault of the engine for 24 hours. It is now `low` with a cause that
+  says what it is, and it is **not** used to supersede anything: the entity is named only in
+  its text, and live the unlock *preceded* the image-not-found failure on the same id, which
+  stays `high` on its own.
+
 ## v0.4.0 — 2026-09-17
 
 A second production run of the same engine ([#1](https://github.com/AIops-tools/OLVM-AIops/issues/1)),

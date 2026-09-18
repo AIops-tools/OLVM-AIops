@@ -188,6 +188,27 @@ Two defects came out of what he reported, both fixed:
   threshold; `USER_ACCOUNT_DISABLED_OR_LOCKED` (160) gets its own `high` cause so the
   consequential outcome is still reported as one.
 
+### 0.4.0 on the same engine, same account (2026-09-17/18)
+
+- **`relatedVmEvents` validated live**: the `UpdateVmInterfaceVDS` 10802 finding was paired with
+  the VM-side 935 vNIC update failure — `secondsApart: 0`, `returned: 1`, `truncated: false`,
+  presented as a candidate. This was the one part of 0.4.0 that existed only in tests.
+- Event 114 reported `low` with the authentication cause (the failed logins were intentional).
+- Still unexercised: a host showing both a `VmLogonVDS` transport timeout and a guest-agent
+  failure (has not occurred there).
+
+Two more catch-all instances came out of his raw rows, both fixed in 0.4.1:
+
+- `DeleteImageGroupVDS failed: Image does not exist` is **10803**, the host-less storage-pool
+  sibling of 10802 — not 10802, which I had told him it was. It fell into the engine
+  diagnosis's catch-all.
+- The manual `unlock_entity.sh` record is **2024 at `alert`**. I had told him it was `normal`
+  and therefore invisible, from the enum declaration; the script inserts its own row at
+  severity 10 and never touches the enum. His team's fix of a real lock was reported as a high
+  engine problem. The row carries no structured reference (the INSERT sets none), so it cannot
+  be tied to an entity except by text — and it preceded the image failure, so it supersedes
+  nothing.
+
 ## 3. Live checklist — still open
 
 - [ ] An engine **without** Keycloak (`admin@internal`).

@@ -707,3 +707,88 @@ def test_an_account_that_got_locked_is_still_reported_high():
     [f] = out["findings"]
     assert f["severity"] == "high" and out["healthy"] is False
     assert "locked" in f["cause"].lower() and "problem for this engine" not in f["cause"]
+
+
+# ─── production feedback (#1, raw rows): 10803 and the manual unlock record ────
+
+IRS_COMMAND_FAILURE = 10803    # AuditLogType.IRS_BROKER_COMMAND_FAILURE(10803, ERROR)
+UNLOCK_SCRIPT_RUN = 2024       # AuditLogType.USER_RUN_UNLOCK_ENTITY_SCRIPT
+
+
+def irs_failure(index, command, message, minutes_ago=10, **refs):
+    """"VDSM command ${CommandName} failed: ${message}" — the storage-pool broker's
+    wrapper. No host name in the template; live, every structured ref was null."""
+    return ev(index, IRS_COMMAND_FAILURE, "error", minutes_ago,
+              f"VDSM command {command} failed: {message}", **refs)
+
+
+def unlock_record(index, minutes_ago=30):
+    """unlock_entity.sh INSERTs this row itself: severity 10 (alert), a fixed message, and
+    no structured reference at all — the entity is named only in the text."""
+    return ev(index, UNLOCK_SCRIPT_RUN, "alert", minutes_ago,
+              "/usr/share/ovirt-engine/setup/dbutils/unlock_entity.sh :  System user root "
+              "run manually unlock_entity script on entity [type,id] [disk,IMG-1] "
+              "with db user engine")
+
+
+def test_a_storage_broker_failure_names_its_command():
+    """Live: `DeleteImageGroupVDS failed: Image does not exist` is 10803, not 10802, and
+    fell through to "The engine logged a problem for this engine" — the catch-all 0.4.0
+    fixed for 10802 and left for its sibling."""
+    engine = Engine([irs_failure(1, "DeleteImageGroupVDS", "Image does not exist in domain")],
+                    hosts=[host("up")])
+    [f] = eh.engine_health_rca(engine)["findings"]
+    assert "DeleteImageGroupVDS" in f["cause"]
+    assert "problem for this engine" not in f["cause"]
+
+
+def test_a_storage_broker_failure_is_not_downgraded():
+    """"Image does not exist" after a manual unlock may be a real inconsistency; the
+    reporter agreed it merits its own investigation."""
+    engine = Engine([irs_failure(1, "DeleteImageGroupVDS", "Image does not exist in domain")],
+                    hosts=[host("up")])
+    out = eh.engine_health_rca(engine)
+    assert out["findings"][0]["severity"] == "high" and out["healthy"] is False
+
+
+def test_two_storage_broker_commands_are_not_collapsed_into_one_finding():
+    """The 0.2.0 lesson for 10802, applied to its sibling: grouping by code lets the newest
+    command classify an older, different one and drops its text from the payload."""
+    engine = Engine([irs_failure(1, "DeleteImageGroupVDS", "Image does not exist",
+                                 minutes_ago=60),
+                     irs_failure(2, "SpmStatusVDS", "Connection refused", minutes_ago=5)],
+                    hosts=[host("up")])
+    causes = " ".join(f["cause"] for f in eh.engine_health_rca(engine)["findings"])
+    assert "DeleteImageGroupVDS" in causes and "SpmStatusVDS" in causes
+
+
+def test_a_storage_broker_failure_names_its_command_wherever_it_lands():
+    """If a 10803 row does carry a storage-domain ref, it goes to the storage diagnosis —
+    and must not fall back to the catch-all there either."""
+    events = [irs_failure(1, "DeleteImageGroupVDS", "Image does not exist",
+                          storage_domain="sd1")]
+    engine = Engine(events, hosts=[host()], domains=[(domain(), "active")])
+    findings = [f for f in dg.storage_capacity_rca(engine)["findings"]
+                if f["signal"].startswith("event ")]
+    assert len(findings) == 1 and "DeleteImageGroupVDS" in findings[0]["cause"]
+
+
+def test_a_manual_unlock_is_not_reported_as_an_engine_problem():
+    """Live: the script writes its row at alert, so the operator's own fix came back as a
+    high "problem for this engine" and kept the engine unhealthy for 24 hours."""
+    out = eh.engine_health_rca(Engine([unlock_record(1)], hosts=[host("up")]))
+    [f] = out["findings"]
+    assert f["severity"] == "low" and out["healthy"] is True
+    assert "unlock_entity" in f["cause"] and "problem for this engine" not in f["cause"]
+
+
+def test_a_manual_unlock_does_not_hide_what_followed_it():
+    """The reporter's engine exactly: the unlock came first, the image-not-found failure
+    after. The downgrade is only safe because the consequence stays high on its own."""
+    out = eh.engine_health_rca(Engine(
+        [unlock_record(1, minutes_ago=30),
+         irs_failure(2, "DeleteImageGroupVDS", "Image does not exist", minutes_ago=10)],
+        hosts=[host("up")]))
+    by_code = {int(f["signal"].split()[1]): f["severity"] for f in out["findings"]}
+    assert by_code == {UNLOCK_SCRIPT_RUN: "low", IRS_COMMAND_FAILURE: "high"}
+    assert out["healthy"] is False

@@ -154,8 +154,12 @@ def engine_health_rca(events_limit: int = 200, events_window_hours: int = 24,
     its summary counts, plus warning-or-worse events that name no host, VM or storage
     domain: engine or CA certificate expiry, missing or failed engine backups, a
     cluster failing its HA reservation. Those alerts appear in no other diagnosis, so
-    call this first for "is anything wrong". Report findings in rank order and quote
-    their signal.
+    call this first for "is anything wrong". Event 10803 (a storage-pool vdsm command
+    failed) names no host and lands here: its cause names the command, which is the
+    subject — not the engine — and its severity is the event's own. Event 2024 is a record
+    that someone ran unlock_entity.sh by hand: it is `low`, and whatever the unlocked
+    entity then did wrong is reported by its own event. Report findings in rank order and
+    quote their signal.
 
     Args:
         events_limit: Recent warning-or-worse events to correlate, 1-1000 (default 200).
