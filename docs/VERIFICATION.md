@@ -209,6 +209,23 @@ Two more catch-all instances came out of his raw rows, both fixed in 0.4.1:
   be tied to an entity except by text — and it preceded the image failure, so it supersedes
   nothing.
 
+### 0.4.1 on the same engine, same account, 96-hour window (2026-09-19)
+
+The reporter ran 0.4.1 against the production rows that motivated it:
+
+- **10803** stays `high` and names `DeleteImageGroupVDS` as its subject; the cause says it comes
+  from the storage-pool broker and is not a fault of the engine itself.
+- **2024** (manual `unlock_entity.sh`) is `low`, describes the database repair, asks for the
+  entity to be checked for consistency, and supersedes nothing.
+- `healthy: false` now rests on the later image-not-found failure, not on the repair — which his
+  team is investigating as a separate storage incident.
+- **114** stays `low` (all six failed logins in the window were intentional).
+- 25 events evaluated, not truncated; health servlet HTTP 200.
+
+Still not exercised in production: the 0.3.0 behaviour for an attached domain with no
+low-space warning threshold, and a host showing both a `VmLogonVDS` transport timeout and a
+guest-agent failure.
+
 ## 3. Live checklist — still open
 
 - [ ] An engine **without** Keycloak (`admin@internal`).
