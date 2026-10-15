@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- The MCP server moved from a top-level `mcp_server` package to
+  `olvm_aiops.mcp_server`. Every AIops tool used to ship its own top-level
+  `mcp_server`, so installing two of them into one environment merged the two
+  into one package: `olvm-aiops-mcp` could start another tool's server, and
+  `olvm-aiops undo` wrote audit and undo rows into the other tool's home
+  directory. Installs through `uvx`, the Claude Code plugin or the OpenClaw
+  bundle were isolated and unaffected. The `olvm-aiops-mcp` command is
+  unchanged; only code that imported `mcp_server` directly must now import
+  `olvm_aiops.mcp_server`.
+
 ## v0.5.0 — 2026-10-15
 
 ### Added

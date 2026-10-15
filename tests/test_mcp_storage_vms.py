@@ -11,7 +11,7 @@ import pytest
 
 import olvm_aiops.governance.audit as audit_mod
 import olvm_aiops.governance.undo as undo_mod
-from mcp_server.tools import storage_vms as tools
+from olvm_aiops.mcp_server.tools import storage_vms as tools
 
 pytestmark = pytest.mark.unit
 

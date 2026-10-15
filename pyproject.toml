@@ -28,10 +28,10 @@ dev = [
 
 [project.scripts]
 olvm-aiops = "olvm_aiops.cli:app"
-olvm-aiops-mcp = "mcp_server.server:main"
+olvm-aiops-mcp = "olvm_aiops.mcp_server.server:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["olvm_aiops", "mcp_server"]
+packages = ["olvm_aiops"]
 
 [tool.ruff]
 line-length = 100
@@ -47,7 +47,7 @@ select = ["E", "F", "I", "N", "W", "UP"]
 "olvm_aiops/governance/*.py" = ["E501", "N818"]
 # MCP server files are reflected by FastMCP/Pydantic; PEP 604 unions (X | None)
 # crash on older mcp/pydantic, so they intentionally use Optional[X].
-"mcp_server/**/*.py" = ["UP007", "UP045"]
+"olvm_aiops/mcp_server/**/*.py" = ["UP007", "UP045"]
 # The MCP entry keeps an explicit Python-version guard even though the declared
 # minimum is already 3.11.
 "olvm_aiops/cli/_root.py" = ["UP036"]

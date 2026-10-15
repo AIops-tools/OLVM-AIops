@@ -10,7 +10,7 @@ import pytest
 
 import olvm_aiops.governance.audit as audit_mod
 import olvm_aiops.governance.undo as undo_mod
-from mcp_server.tools import reads
+from olvm_aiops.mcp_server.tools import reads
 
 pytestmark = pytest.mark.unit
 

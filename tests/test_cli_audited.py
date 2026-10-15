@@ -1,6 +1,6 @@
 """Every CLI read is audited, and a failed read is never a quiet success.
 
-Each read command calls the MCP tool of the same name (``mcp_server.tools``), so it
+Each read command calls the MCP tool of the same name (``olvm_aiops.mcp_server.tools``), so it
 runs through ``@governed_tool`` and lands an audit row. Before this, the CLI called
 ``olvm_aiops.ops`` directly: on a live engine ``olvm-aiops host list`` returned the
 host and never created ``audit.db``, while the documentation promised that every
@@ -59,7 +59,7 @@ def _fixed_now(monkeypatch):
 
 
 def _wire(monkeypatch, get) -> None:
-    from mcp_server.tools import reads, storage_vms
+    from olvm_aiops.mcp_server.tools import reads, storage_vms
 
     for module in (reads, storage_vms):
         monkeypatch.setattr(module, "_get_connection", get)
@@ -109,7 +109,7 @@ def test_every_cli_read_lands_an_audit_row(engine, argv, tool):
 
 def test_every_read_tool_has_an_audited_cli_command():
     """A new read tool without a CLI mapping here fails, so the table cannot rot."""
-    from mcp_server import server
+    from olvm_aiops.mcp_server import server
 
     reads = {name for name, tool in server.mcp._tool_manager._tools.items()
              if (tool.fn.__doc__ or "").lstrip().startswith("[READ]")} - {"undo_list"}

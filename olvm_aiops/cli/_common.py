@@ -68,7 +68,7 @@ EXIT_UNDETERMINED = 2
 def governed(result: Any) -> dict:
     """Return a governed tool's result, or print its error and exit 1.
 
-    The ``mcp_server.tools`` twins never raise: ``@tool_errors`` flattens every
+    The ``olvm_aiops.mcp_server.tools`` twins never raise: ``@tool_errors`` flattens every
     failure — an unreachable engine, a refused login, a bad argument — into
     ``{"error": ...}``. A CLI command that drops that on the floor prints an empty
     table and exits 0 as if the engine had nothing to report. Route every governed

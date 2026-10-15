@@ -1,6 +1,6 @@
 """CLI: engine events and jobs.
 
-Every command calls the MCP tool of the same name in ``mcp_server.tools``, so it is
+Every command calls the MCP tool of the same name in ``olvm_aiops.mcp_server.tools``, so it is
 audited like an MCP call (see ``olvm_aiops.cli.inventory``).
 """
 
@@ -30,7 +30,7 @@ def event_list(
     target: TargetOption = None,
 ) -> None:
     """Engine events, newest first."""
-    from mcp_server.tools import reads
+    from olvm_aiops.mcp_server.tools import reads
 
     out = governed(reads.event_list(limit=limit, min_severity=min_severity, page=page,
                                     after_index=after_index, since_minutes=since_minutes,
@@ -54,7 +54,7 @@ def job_list(
     target: TargetOption = None,
 ) -> None:
     """Engine jobs with status and duration."""
-    from mcp_server.tools import reads
+    from olvm_aiops.mcp_server.tools import reads
 
     out = governed(reads.job_list(limit=limit, status=status, target=target))
     if as_json:

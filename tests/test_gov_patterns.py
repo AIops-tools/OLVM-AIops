@@ -2,7 +2,7 @@
 
 Portable across the whole tool line: references ONLY
 ``olvm_aiops.governance.patterns`` and binds state to an isolated home via
-``OLVM_AIOPS_HOME``. No ops / cli / connection / mcp_server imports.
+``OLVM_AIOPS_HOME``. No ops / cli / connection / olvm_aiops.mcp_server imports.
 
 Exercises pattern loading + signature validation, the armable preconditions,
 skill/tool/target matching, rate limiting, the circuit breaker's state

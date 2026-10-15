@@ -28,7 +28,7 @@ import typer
 from olvm_aiops.cli._common import governed
 
 CLI_DIR = pathlib.Path(__file__).resolve().parents[1] / "olvm_aiops" / "cli"
-TOOLS_DIR = pathlib.Path(__file__).resolve().parents[1] / "mcp_server" / "tools"
+TOOLS_DIR = pathlib.Path(__file__).resolve().parents[1] / "olvm_aiops" / "mcp_server" / "tools"
 
 #: Helpers that end the command non-zero when the payload reports a failure.
 CHECKERS = ['governed']

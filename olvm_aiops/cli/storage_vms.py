@@ -1,6 +1,6 @@
 """CLI: storage domains and VMs (reads) plus their diagnoses.
 
-Every command calls the MCP tool of the same name in ``mcp_server.tools``, so it is
+Every command calls the MCP tool of the same name in ``olvm_aiops.mcp_server.tools``, so it is
 audited like an MCP call (see ``olvm_aiops.cli.inventory``).
 """
 
@@ -42,7 +42,7 @@ def _print_status_errors(out: dict) -> None:
 def storage_list(limit: int = LimitOption, as_json: bool = JsonOption,
                  target: TargetOption = None) -> None:
     """Storage domains with status and capacity."""
-    from mcp_server.tools import storage_vms
+    from olvm_aiops.mcp_server.tools import storage_vms
 
     out = governed(storage_vms.storage_domain_list(limit=limit, target=target))
     if as_json:
@@ -60,7 +60,7 @@ def storage_list(limit: int = LimitOption, as_json: bool = JsonOption,
 def storage_get(domain_id: str = typer.Argument(..., help="Storage domain id."),
                 target: TargetOption = None) -> None:
     """One storage domain, as JSON."""
-    from mcp_server.tools import storage_vms
+    from olvm_aiops.mcp_server.tools import storage_vms
 
     print_json(governed(storage_vms.storage_domain_get(domain_id=domain_id, target=target)))
 
@@ -71,7 +71,7 @@ def storage_capacity(events_window_hours: int = EventsWindowOption,
                      events_limit: int = EventsLimitOption,
                      as_json: bool = JsonOption, target: TargetOption = None) -> None:
     """Storage-domain problems, worst first."""
-    from mcp_server.tools import storage_vms
+    from olvm_aiops.mcp_server.tools import storage_vms
 
     out = governed(storage_vms.storage_capacity_rca(events_limit=events_limit,
                                                     events_window_hours=events_window_hours,
@@ -94,7 +94,7 @@ def vm_list(limit: int = LimitOption,
                                               help="Engine query, e.g. 'status=up'."),
             as_json: bool = JsonOption, target: TargetOption = None) -> None:
     """VMs with status, host and sizing."""
-    from mcp_server.tools import storage_vms
+    from olvm_aiops.mcp_server.tools import storage_vms
 
     out = governed(storage_vms.vm_list(limit=limit, search=search, target=target))
     if as_json:
@@ -109,7 +109,7 @@ def vm_list(limit: int = LimitOption,
 @cli_errors
 def vm_get(vm_id: str = typer.Argument(..., help="VM id."), target: TargetOption = None) -> None:
     """One VM, as JSON."""
-    from mcp_server.tools import storage_vms
+    from olvm_aiops.mcp_server.tools import storage_vms
 
     print_json(governed(storage_vms.vm_get(vm_id=vm_id, target=target)))
 
@@ -118,7 +118,7 @@ def vm_get(vm_id: str = typer.Argument(..., help="VM id."), target: TargetOption
 @cli_errors
 def vm_stats(vm_id: str = typer.Argument(..., help="VM id."), target: TargetOption = None) -> None:
     """A VM's current statistics, as JSON."""
-    from mcp_server.tools import storage_vms
+    from olvm_aiops.mcp_server.tools import storage_vms
 
     print_json(governed(storage_vms.vm_stats(vm_id=vm_id, target=target)))
 
@@ -129,7 +129,7 @@ def vm_health(events_window_hours: int = EventsWindowOption,
               events_limit: int = EventsLimitOption,
               as_json: bool = JsonOption, target: TargetOption = None) -> None:
     """VM problems, worst first."""
-    from mcp_server.tools import storage_vms
+    from olvm_aiops.mcp_server.tools import storage_vms
 
     out = governed(storage_vms.vm_health_rca(events_limit=events_limit,
                                              events_window_hours=events_window_hours,

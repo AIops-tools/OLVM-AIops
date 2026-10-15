@@ -43,11 +43,11 @@ def test_all_modules_import():
         "olvm_aiops.cli.inventory",
         "olvm_aiops.cli.activity",
         "olvm_aiops.cli.storage_vms",
-        "mcp_server.server",
-        "mcp_server._shared",
-        "mcp_server.tools.undo",
-        "mcp_server.tools.reads",
-        "mcp_server.tools.storage_vms",
+        "olvm_aiops.mcp_server.server",
+        "olvm_aiops.mcp_server._shared",
+        "olvm_aiops.mcp_server.tools.undo",
+        "olvm_aiops.mcp_server.tools.reads",
+        "olvm_aiops.mcp_server.tools.storage_vms",
         "olvm_aiops.ops.storage",
         "olvm_aiops.ops.vms",
         "olvm_aiops.ops.inventory",
@@ -105,7 +105,7 @@ def test_cli_leaf_help_triggers_lazy_imports():
 
 @pytest.mark.unit
 def test_mcp_list_tools_exposes_expected_tools():
-    from mcp_server.server import mcp
+    from olvm_aiops.mcp_server.server import mcp
 
     names = {t.name for t in asyncio.run(mcp.list_tools())}
     assert names == EXPECTED_TOOLS, (
@@ -114,7 +114,7 @@ def test_mcp_list_tools_exposes_expected_tools():
 
 @pytest.mark.unit
 def test_every_mcp_tool_is_governed_by_harness():
-    from mcp_server import server
+    from olvm_aiops.mcp_server import server
 
     tool_objs = server.mcp._tool_manager._tools
     assert set(tool_objs) == EXPECTED_TOOLS, "tool registry differs from EXPECTED_TOOLS"
@@ -154,7 +154,7 @@ def test_risk_level_agrees_with_read_write_docstring_tag():
     is what docs and capability tables are built from. Line-wide this caught
     16 writes mislabelled as reads once, so every new tool inherits it.
     """
-    from mcp_server import server
+    from olvm_aiops.mcp_server import server
 
     untagged, mismatched = [], []
     for name, tool in server.mcp._tool_manager._tools.items():

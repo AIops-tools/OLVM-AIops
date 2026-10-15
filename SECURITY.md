@@ -75,7 +75,7 @@ No post-install scripts or background services.
 ## Static Analysis
 
 ```bash
-uvx bandit -r olvm_aiops/ mcp_server/
+uvx bandit -r olvm_aiops/
 uv run ruff check .
 ```
 

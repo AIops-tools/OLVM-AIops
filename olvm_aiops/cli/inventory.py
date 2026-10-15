@@ -1,6 +1,6 @@
 """CLI: data centers, clusters and hosts (reads) plus host diagnosis.
 
-Every command calls the MCP tool of the same name in ``mcp_server.tools``, so a CLI
+Every command calls the MCP tool of the same name in ``olvm_aiops.mcp_server.tools``, so a CLI
 read runs through the same ``@governed_tool`` harness as the MCP server: an audit
 row, the budget and the runaway breaker. Calling ``olvm_aiops.ops`` directly would
 leave no trace in the audit log.
@@ -108,7 +108,7 @@ def _print_candidates(candidates: dict | None) -> None:
 def datacenter_list(limit: int = LimitOption, as_json: bool = JsonOption,
                     target: TargetOption = None) -> None:
     """Data centers with status and compatibility version."""
-    from mcp_server.tools import reads
+    from olvm_aiops.mcp_server.tools import reads
 
     out = governed(reads.datacenter_list(limit=limit, target=target))
     if as_json:
@@ -124,7 +124,7 @@ def datacenter_list(limit: int = LimitOption, as_json: bool = JsonOption,
 def cluster_list(limit: int = LimitOption, as_json: bool = JsonOption,
                  target: TargetOption = None) -> None:
     """Clusters with compatibility version and CPU type."""
-    from mcp_server.tools import reads
+    from olvm_aiops.mcp_server.tools import reads
 
     out = governed(reads.cluster_list(limit=limit, target=target))
     if as_json:
@@ -142,7 +142,7 @@ def host_list(limit: int = LimitOption,
                                                 help="Engine query, e.g. 'status!=up'."),
               as_json: bool = JsonOption, target: TargetOption = None) -> None:
     """KVM hosts with status, SPM role and VM counts."""
-    from mcp_server.tools import reads
+    from olvm_aiops.mcp_server.tools import reads
 
     out = governed(reads.host_list(limit=limit, search=search, target=target))
     if as_json:
@@ -158,7 +158,7 @@ def host_list(limit: int = LimitOption,
 def host_get(host_id: str = typer.Argument(..., help="Host id (see 'host list')."),
              target: TargetOption = None) -> None:
     """One host, as JSON."""
-    from mcp_server.tools import reads
+    from olvm_aiops.mcp_server.tools import reads
 
     print_json(governed(reads.host_get(host_id=host_id, target=target)))
 
@@ -169,7 +169,7 @@ def host_health(events_window_hours: int = EventsWindowOption,
                 events_limit: int = EventsLimitOption,
                 as_json: bool = JsonOption, target: TargetOption = None) -> None:
     """What needs attention on hosts, worst first."""
-    from mcp_server.tools import reads
+    from olvm_aiops.mcp_server.tools import reads
 
     out = governed(reads.host_health_rca(events_limit=events_limit,
                                          events_window_hours=events_window_hours,
@@ -190,7 +190,7 @@ def engine_health(events_window_hours: int = EventsWindowOption,
                   events_limit: int = EventsLimitOption,
                   as_json: bool = JsonOption, target: TargetOption = None) -> None:
     """Problems with the engine itself (health check, clock, certificates, backups)."""
-    from mcp_server.tools import reads
+    from olvm_aiops.mcp_server.tools import reads
 
     out = governed(reads.engine_health_rca(events_limit=events_limit,
                                            events_window_hours=events_window_hours,

@@ -31,7 +31,7 @@ def gov_home(tmp_path, monkeypatch):
 
 @pytest.mark.unit
 def test_tool_errors_shapes():
-    from mcp_server._shared import tool_errors
+    from olvm_aiops.mcp_server._shared import tool_errors
 
     @tool_errors("dict")
     def d():
@@ -52,7 +52,7 @@ def test_tool_errors_shapes():
 
 @pytest.mark.unit
 def test_safe_error_masks_unexpected_exception_type():
-    from mcp_server._shared import _safe_error
+    from olvm_aiops.mcp_server._shared import _safe_error
 
     # A passthrough type keeps its message...
     assert "boom" in _safe_error(ValueError("boom"), "t")
@@ -68,7 +68,7 @@ def test_safe_error_masks_unexpected_exception_type():
 
 @pytest.mark.unit
 def test_get_connection_lazy_inits_manager(monkeypatch, tmp_path):
-    import mcp_server._shared as shared
+    import olvm_aiops.mcp_server._shared as shared
 
     cfg_file = tmp_path / "config.yaml"
     cfg_file.write_text("targets:\n  - name: engine1\n    url: https://engine.example\n"
@@ -97,7 +97,7 @@ def test_get_connection_lazy_inits_manager(monkeypatch, tmp_path):
 
 @pytest.mark.unit
 def test_server_main_runs_transport(monkeypatch):
-    import mcp_server.server as server
+    import olvm_aiops.mcp_server.server as server
 
     called = {}
     monkeypatch.setattr(server.mcp, "run", lambda transport: called.setdefault("t", transport))
@@ -109,7 +109,7 @@ def test_server_main_runs_transport(monkeypatch):
 def test_root_mcp_command_invokes_server_main(monkeypatch):
     from typer.testing import CliRunner
 
-    import mcp_server.server as server
+    import olvm_aiops.mcp_server.server as server
     from olvm_aiops.cli import app
 
     ran = {}
@@ -147,8 +147,8 @@ def _record(undo_tool="_undo_probe2", params=None):
 
 @pytest.fixture
 def undo_probe(gov_home):
-    from mcp_server._shared import mcp
     from olvm_aiops.governance import governed_tool
+    from olvm_aiops.mcp_server._shared import mcp
 
     calls: list[dict] = []
 
@@ -192,7 +192,7 @@ def test_cli_undo_apply_confirmed_dispatches_inverse(gov_home, undo_probe):
 
 @pytest.mark.unit
 def test_undo_apply_passes_target_and_bad_params(gov_home, undo_probe):
-    from mcp_server.tools import undo as gov
+    from olvm_aiops.mcp_server.tools import undo as gov
 
     # Corrupt undo_params must REFUSE, not fall back to {} and dispatch.
     #
@@ -235,7 +235,7 @@ def test_concurrent_first_tool_calls_share_one_connection_manager(monkeypatch):
     import threading
     import time as _time
 
-    import mcp_server._shared as shared
+    import olvm_aiops.mcp_server._shared as shared
 
     made: list[int] = []
 

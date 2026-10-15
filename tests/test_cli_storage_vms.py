@@ -32,7 +32,7 @@ def wired(monkeypatch):
               "/events": {}}
     conn = MagicMock()
     conn.get.side_effect = lambda path, params=None: routes[path]
-    from mcp_server.tools import storage_vms
+    from olvm_aiops.mcp_server.tools import storage_vms
 
     monkeypatch.setattr(storage_vms, "_get_connection", lambda target=None: conn)
     return vm
