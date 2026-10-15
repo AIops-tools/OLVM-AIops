@@ -5,7 +5,7 @@
       "command": "uvx",
       "args": [
         "--from",
-        "olvm-aiops==0.5.0",
+        "olvm-aiops==0.6.0",
         "olvm-aiops-mcp"
       ]
     }
