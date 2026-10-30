@@ -31,6 +31,8 @@ compatibility: >
 
 # OLVM AIops
 
+> **Audit availability:** Real writes require a durable audit intent. Reads and previews can continue if audit storage fails; check the warning and audit health before relying on their audit trail.
+
 > **Disclaimer**: This is a community-maintained open-source project and is **not affiliated with, endorsed by, or sponsored by Oracle or the oVirt project.** "Oracle", "Oracle Linux" and "oVirt" are trademarks of their owners. Source code is publicly auditable at [github.com/AIops-tools/OLVM-AIops](https://github.com/AIops-tools/OLVM-AIops) under the MIT license.
 
 Governed operations for **Oracle Linux Virtualization Manager (OLVM)** and **oVirt 4.5** through the engine REST API — **17 MCP tools**, every one wrapped with the bundled `@governed_tool` harness: a local audit log under `~/.olvm-aiops/`, a token/runaway budget guard, and descriptive risk tiers. The engine password is stored **encrypted** (`~/.olvm-aiops/secrets.enc`) — never plaintext on disk.
@@ -198,7 +200,7 @@ The id is stale — list the parent collection again.
 
 The skill reads and records; it does **not** decide what an agent may change. That belongs to the engine account you connect it with — give it a read-only role and the engine itself refuses anything else.
 
-- **Audit is the guarantee, and it is not bypassable.** Every call — MCP and CLI alike — is logged to `~/.olvm-aiops/audit.db` (relocatable via `OLVM_AIOPS_HOME`): params (secrets redacted), result, status, duration, and the risk tier.
+- **Audit is the guarantee, and it is not bypassable.** Every call — MCP and CLI alike — is logged to `~/.olvm-aiops/audit.db` (relocatable via `OLVM_AIOPS_HOME`): params (secrets redacted), outcome summary, status, duration, and the risk tier.
 - The engine password is stored **encrypted** in `~/.olvm-aiops/secrets.enc` (Fernet/AES-128 + scrypt key derivation; chmod 600); the master password is never stored. The SSO token is held only in memory and revoked when the connection closes.
 - SSO session ids that the engine prints in login events are redacted before any event text is returned.
 - **Budget / runaway guard** — a safety backstop, not authorization: caps cumulative tool calls and wall-time, and trips on tight polling loops.
