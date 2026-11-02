@@ -40,15 +40,16 @@ def storage_domain_get(domain_id: str, target: Optional[str] = None) -> dict:
 @governed_tool(risk_level="low")
 @tool_errors("dict")
 def vm_list(limit: int = 100, search: Optional[str] = None,
-            target: Optional[str] = None) -> dict:
+            target: Optional[str] = None, page: int = 1) -> dict:
     """[READ] VMs with status, host, vCPUs, memory and high-availability flag.
 
     Args:
-        limit: Rows to return, 1-1000 (default 100); `truncated` says when more exist.
-        search: Engine query language, e.g. "status=up" or "cluster=Default".
+        limit: Rows per page, 1-1000 (default 100).
+        search: Engine criteria, e.g. "status=up" or "cluster=Default"; omit `page`.
         target: Engine target name from config; omit to use the default.
+        page: One-based page number (default 1). Follow `nextPage` until null.
     """
-    return vms.list_vms(_get_connection(target), limit=limit, search=search)
+    return vms.list_vms(_get_connection(target), limit=limit, search=search, page=page)
 
 
 @mcp.tool()

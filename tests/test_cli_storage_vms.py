@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import re
 from unittest.mock import MagicMock
 
 import pytest
@@ -31,7 +32,13 @@ def wired(monkeypatch):
               "/vms": {"vm": [vm]}, f"/vms/{vm['id']}/statistics": run("vm_statistics"),
               "/events": {}}
     conn = MagicMock()
-    conn.get.side_effect = lambda path, params=None: routes[path]
+    def get(path, params=None):
+        if path == "/vms" and params and "page" in params.get("search", ""):
+            page = int(re.search(r"page (\d+)$", params["search"]).group(1))
+            return {"vm": [vm] if page == 1 else []}
+        return routes[path]
+
+    conn.get.side_effect = get
     from olvm_aiops.mcp_server.tools import storage_vms
 
     monkeypatch.setattr(storage_vms, "_get_connection", lambda target=None: conn)
@@ -62,7 +69,16 @@ def test_vm_health_and_stats(wired):
 def test_vm_list_json(wired):
     r = runner.invoke(app, ["vm", "list", "--json"])
     assert r.exit_code == 0, r.output
-    assert json.loads(r.stdout)["vms"][0]["status"] == "up"
+    out = json.loads(r.stdout)
+    assert out["vms"][0]["status"] == "up"
+    assert out["page"] == 1 and out["nextPage"] is None
+
+
+def test_vm_list_page_option_reaches_the_engine(wired):
+    r = runner.invoke(app, ["vm", "list", "--page", "2", "--json"])
+    assert r.exit_code == 0, r.output
+    out = json.loads(r.stdout)
+    assert out["vms"] == [] and out["page"] == 2 and out["nextPage"] is None
 
 
 @pytest.fixture(autouse=True)

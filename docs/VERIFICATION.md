@@ -270,3 +270,22 @@ and any undo token reflect the confirmed outcome, not the engine's immediate `co
 ## Governance hardening — local synthetic verification (2026-10-30)
 
 The shared governance tests exercise a durable `pending` row before a write, refusal when the audit DB cannot persist that row, a visible pending row after finalization failure, explicit reconciliation to `unknown`, async/preview parity, result minimization, and metadata-only telemetry with `AIOPS_WORKFLOW_ID`. The tests use a temporary SQLite DB and synthetic tools; they do not claim a new live upstream write was performed. Existing audit rows and rotated archives from earlier releases are not automatically scrubbed. A pending intent from another process is never auto-reconciled. On POSIX the rotation/intent lock spans processes; on Windows it currently protects only threads in this process.
+
+## VM pagination — issue #2 (2026-11-02)
+
+The [oVirt Engine API model, §3.7.5](https://ovirt.github.io/ovirt-engine-api-model/4.4/index#pagination)
+defines `search=page N` with `max` as the page size and warns that the API is
+stateless: concurrent changes can duplicate or omit objects between pages.
+The [VM list method](https://github.com/oVirt/ovirt-engine-api-model/blob/master/src/main/java/services/VmsService.java)
+guarantees ordering only when `sortby` is present. `vm_list` therefore adds a
+default `sortby name`, uses the same `max` on every page, and probes the next
+page before reporting `truncated` / `nextPage`. A fake that implements these
+server semantics verifies that five VMs cross three pages without a shifted
+boundary. A local HTTP server test also exercises SSO login, real httpx query
+encoding and the same page walk through `OlvmConnection`. The CLI and MCP inputs
+both expose `page`.
+
+**Not live-verified on a large OLVM engine:** no configured engine was available
+in this workspace. No exact `total` or snapshot-consistency claim is made; a
+real inventory with more than 1000 VMs and concurrent create/delete activity
+remains the follow-up verification target.

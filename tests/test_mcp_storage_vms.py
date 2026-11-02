@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import re
 import sqlite3
 from unittest.mock import MagicMock
 
@@ -44,7 +45,13 @@ def wired(monkeypatch):
               "/vms": run("vms"), f"/vms/{vm['id']}": vm,
               f"/vms/{vm['id']}/statistics": run("vm_statistics"), "/events": {}}
     conn = MagicMock()
-    conn.get.side_effect = lambda path, params=None: routes[path]
+    def get(path, params=None):
+        if path == "/vms" and params and "page" in params.get("search", ""):
+            page = int(re.search(r"page (\d+)$", params["search"]).group(1))
+            return routes[path] if page == 1 else {"vm": []}
+        return routes[path]
+
+    conn.get.side_effect = get
     monkeypatch.setattr(tools, "_get_connection", lambda target=None: conn)
     return {"nfs_id": nfs["id"], "vm_id": vm["id"]}
 
@@ -60,6 +67,13 @@ def test_tools_reach_their_ops(wired):
 
 def test_missing_id_is_the_error_envelope(wired):
     assert "required" in tools.vm_get(vm_id=" ")["error"]
+
+
+def test_vm_list_exposes_page_and_continuation(wired):
+    first = tools.vm_list(limit=1)
+    assert first["page"] == 1 and first["nextPage"] is None
+    second = tools.vm_list(limit=1, page=2)
+    assert second["vms"] == [] and second["page"] == 2
 
 
 def test_storage_tool_calls_are_audited(wired, gov_home):

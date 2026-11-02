@@ -49,6 +49,14 @@ the tool already guarantees and a ready-made system prompt for the rest.
 **17 MCP tools**: 15 reads and diagnoses, plus the harness's `undo_list` /
 `undo_apply` (which have nothing to undo in a read-only release).
 
+`vm_list` accepts a one-based `page` (CLI: `olvm-aiops vm list --page 2`). Keep
+the same `limit` and `search`, then follow `nextPage` until it is `null`. Each
+response includes `page`, `returned`, `limit`, `truncated`, and `total: null`:
+the engine has no atomic total-count field. The tool orders by VM name unless
+the search already specifies `sortby`. oVirt paging is stateless, so concurrent
+VM changes can still duplicate or omit rows across requests; do not claim an
+exact fleet total from a changing inventory.
+
 Each diagnosis ranks findings worst first; every finding carries the measured
 `signal`, a `cause`, an `action` and an explicit `rank`. Transient states are not
 reported as failures: a host the engine is installing or rebooting is "in

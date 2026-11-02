@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.7.1 — 2026-11-02
+
+### Fixed
+- `vm_list` now exposes one-based `page` and `nextPage` in MCP and CLI. It uses the engine's `page N` search clause with a constant page size and ordered results, so callers can reach VMs beyond the first batch without shifting page boundaries. `total` is `null` because the engine does not return an atomic collection count; concurrent inventory changes can still make a multi-page traversal inconsistent.
+
 ## v0.7.0 — 2026-10-30
 
 ### Security and observability (BREAKING)

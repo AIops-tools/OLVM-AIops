@@ -33,13 +33,16 @@ olvm-aiops host list [--search 'status!=up'] [--limit 100] [--json]
 olvm-aiops host get <host-id>
 olvm-aiops storage list [--limit 100] [--json]
 olvm-aiops storage get <domain-id>
-olvm-aiops vm list [--search 'status=up'] [--limit 100] [--json]
+olvm-aiops vm list [--search 'status=up'] [--limit 100] [--page 1] [--json]
 olvm-aiops vm get <vm-id>
 olvm-aiops vm stats <vm-id>
 ```
 
-`--search` is the engine's own query language, passed through unchanged
-(`status=up`, `cluster=Default`, `name=web*`).
+`--search` accepts engine criteria (`status=up`, `cluster=Default`, `name=web*`)
+and an optional `sortby` clause. Use `--page` for VM pagination instead of
+putting `page N` inside `--search`. Keep the same limit and search for each
+page, and follow the JSON `nextPage` until null. The engine has no atomic total
+count and may change between pages.
 
 ## Activity
 

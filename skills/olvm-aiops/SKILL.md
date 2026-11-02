@@ -135,13 +135,16 @@ Needs `uvx` on `PATH`: the MCP server is fetched with uv, pinned to this release
 | `cluster_list` | Clusters, compatibility version, CPU type, memory over-commit |
 | `host_list` / `host_get` | Hosts: status, SPM role, memory, VM counts (engine search supported) |
 | `storage_domain_list` / `storage_domain_get` | Domains: data-center-scoped status, free/used/committed bytes and % |
-| `vm_list` / `vm_get` | VMs: status, host, vCPUs, memory, HA, start/stop time (engine search supported) |
+| `vm_list` / `vm_get` | VMs: status, host, vCPUs, memory, HA, start/stop time; `vm_list` supports engine search and `page`/`nextPage` |
 | `vm_stats` | A VM's current memory, CPU %, network and disk statistics with units |
 | `event_list` | Events newest first: severity threshold, `page`, `after_index` cursor (oldest first), `since_minutes` |
 | `job_list` | Jobs newest first, optional status filter |
 | `undo_list` / `undo_apply` | Harness undo log (empty in this read-only release) |
 
 Any listing with a `limit` returns `returned`, `limit` and a measured `truncated`. A field the engine did not report is `null`, never an invented 0.
+For a full VM walk, call `vm_list` with the same `limit` and `search` while
+following `nextPage` to `null`. `total` is `null`; the engine's stateless pages
+cannot prove a single consistent snapshot if VMs change during the walk.
 
 ## CLI Quick Reference
 
@@ -153,6 +156,7 @@ olvm-aiops vm health                       # VM findings, worst first
 olvm-aiops host list --search 'status!=up'
 olvm-aiops storage list
 olvm-aiops vm list --search 'status=up'
+olvm-aiops vm list --limit 100 --page 2 --json
 olvm-aiops vm stats <vm-id>
 olvm-aiops event list --min-severity warning --since-minutes 60
 olvm-aiops event list --after-index 1234

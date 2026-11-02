@@ -8,6 +8,7 @@ statistics are gauges whose ``datum`` is an int for bytes and a float for percen
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from olvm_aiops.connection import _seg
@@ -48,14 +49,41 @@ def vm_row(vm: dict) -> dict:
     }
 
 
-def list_vms(conn: Any, limit: int = u.DEFAULT_LIST_LIMIT, search: str | None = None) -> dict:
+def list_vms(conn: Any, limit: int = u.DEFAULT_LIST_LIMIT, search: str | None = None,
+             page: int = 1) -> dict:
     """[READ] VMs with status, host, sizing and HA flag.
 
     ``search`` uses the engine query language (e.g. ``status=up``,
-    ``cluster=Default``, ``host=kvm1``).
+    ``cluster=Default``, ``host=kvm1``). The engine sizes each page with ``max``;
+    it has no offset or total count. Page boundaries are stable only while the
+    inventory stays unchanged between requests.
     """
-    rows, truncated = u.fetch_page(conn, "/vms", "vm", limit, search=search)
-    return u.envelope("vms", [vm_row(r) for r in rows], limit, truncated)
+    limit = u.bounded_limit(limit)
+    if isinstance(page, bool) or not isinstance(page, int) or page < 1:
+        raise ValueError("page must be a positive integer.")
+    if search is not None and not isinstance(search, str):
+        raise ValueError("search must be a string.")
+    criteria = (search or "").strip()
+    if re.search(r"\bpage\s+\d+\b", criteria, re.IGNORECASE):
+        raise ValueError("Pass page as the page argument, not inside search.")
+    ordered = criteria if re.search(r"\bsortby\b", criteria, re.IGNORECASE) else (
+        f"{criteria} sortby name" if criteria else "sortby name"
+    )
+
+    def fetch(number: int) -> list[dict]:
+        query = f"{ordered} page {number}"
+        body = conn.get("/vms", params={"max": str(limit), "search": query})
+        rows = u.items(body, "vm")
+        if any(not isinstance(row, dict) for row in body.get("vm", [])):
+            raise ValueError(f"Engine returned a non-object VM on page {number}.")
+        if len(rows) > limit:
+            raise ValueError(f"Engine returned more VMs than max={limit} on page {number}.")
+        return rows
+
+    rows = fetch(page)
+    has_next = bool(fetch(page + 1)) if len(rows) == limit else False
+    return {**u.envelope("vms", [vm_row(r) for r in rows], limit, has_next),
+            "page": page, "nextPage": page + 1 if has_next else None, "total": None}
 
 
 def get_vm(conn: Any, vm_id: str) -> dict:

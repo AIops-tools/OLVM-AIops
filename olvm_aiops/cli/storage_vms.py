@@ -92,17 +92,21 @@ def storage_capacity(events_window_hours: int = EventsWindowOption,
 def vm_list(limit: int = LimitOption,
             search: str | None = typer.Option(None, "--search",
                                               help="Engine query, e.g. 'status=up'."),
+            page: int = typer.Option(1, "--page", min=1,
+                                     help="One-based page number; follow nextPage."),
             as_json: bool = JsonOption, target: TargetOption = None) -> None:
     """VMs with status, host and sizing."""
     from olvm_aiops.mcp_server.tools import storage_vms
 
-    out = governed(storage_vms.vm_list(limit=limit, search=search, target=target))
+    out = governed(storage_vms.vm_list(limit=limit, search=search, target=target, page=page))
     if as_json:
         print_json(out)
         return
     _table("VMs", ["name", "status", "vcpus", "memoryBytes", "highAvailability", "hostId"],
            out["vms"])
-    _footer(out)
+    if out["nextPage"] is not None:
+        console.print(f"[yellow]More VMs: run with --page {out['nextPage']} "
+                      f"and the same --limit/--search.[/]")
 
 
 @vm_app.command("get")
