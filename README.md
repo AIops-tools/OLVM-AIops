@@ -42,20 +42,30 @@ the tool already guarantees and a ready-made system prompt for the rest.
 | What is wrong with my hosts? | `host_health_rca` | `olvm-aiops host health` |
 | Is storage about to stop the engine creating disks? | `storage_capacity_rca` | `olvm-aiops storage capacity` |
 | Why is this VM paused / not responding? | `vm_health_rca` | `olvm-aiops vm health` |
+| How many VMs and configured vCPUs are on this engine, and what is their ratio to host cores? | `vm_capacity_summary` | `olvm-aiops vm capacity` |
 | What happened recently? What is new since I last looked? | `event_list` | `olvm-aiops event list` |
 | What long-running operations failed? | `job_list` | `olvm-aiops job list --status failed` |
 | Inventory | `datacenter_list`, `cluster_list`, `host_list`/`host_get`, `storage_domain_list`/`storage_domain_get`, `vm_list`/`vm_get`, `vm_stats` | `datacenter`, `cluster`, `host`, `storage`, `vm` |
 
-**17 MCP tools**: 15 reads and diagnoses, plus the harness's `undo_list` /
+**18 MCP tools**: 16 reads and diagnoses, plus the harness's `undo_list` /
 `undo_apply` (which have nothing to undo in a read-only release).
 
 `vm_list` accepts a one-based `page` (CLI: `olvm-aiops vm list --page 2`). Keep
 the same `limit` and `search`, then follow `nextPage` until it is `null`. Each
 response includes `page`, `returned`, `limit`, `truncated`, and `total: null`:
 the engine has no atomic total-count field. The tool orders by VM name unless
-the search already specifies `sortby`. oVirt paging is stateless, so concurrent
+the search already specifies `sortby`; it adds an explicit `asc` direction to
+bare sorts because live OLVM 4.5.5 engines returned an empty page without it.
+Agents should request no more than 20 rows per call: a large MCP response can
+be clipped before the model sees its continuation metadata. oVirt paging is stateless, so concurrent
 VM changes can still duplicate or omit rows across requests; do not claim an
 exact fleet total from a changing inventory.
+
+`vm_capacity_summary` walks VM pages within the server and returns only aggregates:
+VM count, configured vCPUs, physical host cores and assignment ratio. If a page
+limit, duplicate ID, missing CPU topology or truncated host inventory prevents
+a supported total, `complete` is false and affected totals are `null`.
+`snapshotConsistent` is always false: a completed walk is not an atomic engine snapshot.
 
 Each diagnosis ranks findings worst first; every finding carries the measured
 `signal`, a `cause`, an `action` and an explicit `rank`. Transient states are not

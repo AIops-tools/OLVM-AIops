@@ -1,7 +1,7 @@
 {
   "id": "olvm-aiops",
   "name": "OLVM AIops",
-  "description": "Governed OLVM / oVirt 4.5 ops — 17 MCP tools: inventory, health, capacity, diagnosis; audited.",
+  "description": "Governed OLVM / oVirt 4.5 ops — 18 MCP tools: inventory, health, capacity, diagnosis; audited.",
   "skills": [
     "./skills"
   ],
@@ -11,7 +11,7 @@
       "command": "uvx",
       "args": [
         "--from",
-        "olvm-aiops==0.7.1",
+        "olvm-aiops==0.7.2",
         "olvm-aiops-mcp"
       ]
     }

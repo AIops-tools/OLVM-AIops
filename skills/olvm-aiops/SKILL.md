@@ -2,7 +2,7 @@
 name: olvm-aiops
 slug: olvm-aiops
 displayName: "OLVM AIops"
-summary: "Governed OLVM / oVirt 4.5 ops — 17 MCP tools: inventory, health, capacity, diagnosis; audited."
+summary: "Governed OLVM / oVirt 4.5 ops — 18 MCP tools: inventory, health, capacity, diagnosis; audited."
 license: MIT
 homepage: https://github.com/AIops-tools/OLVM-AIops
 tags: [aiops, mcp, governance, olvm, ovirt]
@@ -35,7 +35,7 @@ compatibility: >
 
 > **Disclaimer**: This is a community-maintained open-source project and is **not affiliated with, endorsed by, or sponsored by Oracle or the oVirt project.** "Oracle", "Oracle Linux" and "oVirt" are trademarks of their owners. Source code is publicly auditable at [github.com/AIops-tools/OLVM-AIops](https://github.com/AIops-tools/OLVM-AIops) under the MIT license.
 
-Governed operations for **Oracle Linux Virtualization Manager (OLVM)** and **oVirt 4.5** through the engine REST API — **17 MCP tools**, every one wrapped with the bundled `@governed_tool` harness: a local audit log under `~/.olvm-aiops/`, a token/runaway budget guard, and descriptive risk tiers. The engine password is stored **encrypted** (`~/.olvm-aiops/secrets.enc`) — never plaintext on disk.
+Governed operations for **Oracle Linux Virtualization Manager (OLVM)** and **oVirt 4.5** through the engine REST API — **18 MCP tools**, every one wrapped with the bundled `@governed_tool` harness: a local audit log under `~/.olvm-aiops/`, a token/runaway budget guard, and descriptive risk tiers. The engine password is stored **encrypted** (`~/.olvm-aiops/secrets.enc`) — never plaintext on disk.
 
 > **Read-only in this release.** Inventory, health, capacity and diagnosis. Engine actions are asynchronous — the engine answers `complete` long before a VM or host reaches its target state — so write tools are held back until each can confirm its own outcome.
 
@@ -123,7 +123,7 @@ Needs `uvx` on `PATH`: the MCP server is fetched with uv, pinned to this release
 | Cloud models (Claude, GPT) | Either | MCP gives structured JSON I/O |
 | Automated pipelines | **MCP** | type-safe parameters, audited |
 
-## MCP Tools (17 — 15 read, 2 undo)
+## MCP Tools (18 — 16 read, 2 undo)
 
 | Tool | What it answers |
 |---|---|
@@ -136,15 +136,22 @@ Needs `uvx` on `PATH`: the MCP server is fetched with uv, pinned to this release
 | `host_list` / `host_get` | Hosts: status, SPM role, memory, VM counts (engine search supported) |
 | `storage_domain_list` / `storage_domain_get` | Domains: data-center-scoped status, free/used/committed bytes and % |
 | `vm_list` / `vm_get` | VMs: status, host, vCPUs, memory, HA, start/stop time; `vm_list` supports engine search and `page`/`nextPage` |
+| `vm_capacity_summary` | Compact engine-wide VM/vCPU count and vCPU-to-host-core assignment; `complete` and `snapshotConsistent` state the limits |
 | `vm_stats` | A VM's current memory, CPU %, network and disk statistics with units |
 | `event_list` | Events newest first: severity threshold, `page`, `after_index` cursor (oldest first), `since_minutes` |
 | `job_list` | Jobs newest first, optional status filter |
 | `undo_list` / `undo_apply` | Harness undo log (empty in this read-only release) |
 
 Any listing with a `limit` returns `returned`, `limit` and a measured `truncated`. A field the engine did not report is `null`, never an invented 0.
-For a full VM walk, call `vm_list` with the same `limit` and `search` while
-following `nextPage` to `null`. `total` is `null`; the engine's stateless pages
+For a full VM walk, call `vm_list` with `limit=20` and the same `search` while
+following `nextPage` to `null`. Do not ask for one giant page: an MCP client may
+clip the response before the model sees all VMs or `nextPage`. If any page or its
+continuation metadata is clipped or missing, do not calculate a fleet total or
+ranking from the visible subset. `total` is `null`; the engine's stateless pages
 cannot prove a single consistent snapshot if VMs change during the walk.
+For fleet counts or assignment ratio, prefer `vm_capacity_summary` so the VM
+rows do not enter the model context. Quote its totals only when `complete` is
+true; even then, `snapshotConsistent=false` means it is not an atomic snapshot.
 
 ## CLI Quick Reference
 
@@ -157,6 +164,7 @@ olvm-aiops host list --search 'status!=up'
 olvm-aiops storage list
 olvm-aiops vm list --search 'status=up'
 olvm-aiops vm list --limit 100 --page 2 --json
+olvm-aiops vm capacity --json
 olvm-aiops vm stats <vm-id>
 olvm-aiops event list --min-severity warning --since-minutes 60
 olvm-aiops event list --after-index 1234

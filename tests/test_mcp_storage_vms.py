@@ -42,7 +42,7 @@ def wired(monkeypatch):
     routes = {"/storagedomains": glob,
               f"/datacenters/{dc_id}/storagedomains": run("datacenter_storagedomains"),
               f"/storagedomains/{nfs['id']}": run("storagedomain_get"),
-              "/vms": run("vms"), f"/vms/{vm['id']}": vm,
+              "/vms": run("vms"), "/hosts": run("hosts"), f"/vms/{vm['id']}": vm,
               f"/vms/{vm['id']}/statistics": run("vm_statistics"), "/events": {}}
     conn = MagicMock()
     def get(path, params=None):
@@ -74,6 +74,19 @@ def test_vm_list_exposes_page_and_continuation(wired):
     assert first["page"] == 1 and first["nextPage"] is None
     second = tools.vm_list(limit=1, page=2)
     assert second["vms"] == [] and second["page"] == 2
+
+
+def test_vm_capacity_summary_is_compact_and_governed(wired, gov_home):
+    out = tools.vm_capacity_summary()
+    assert out["vmCount"] == 1 and out["pagesRead"] == 1
+    assert "vms" not in out and out["snapshotConsistent"] is False
+    conn = sqlite3.connect(gov_home / "audit.db")
+    try:
+        count = conn.execute(
+            "SELECT count(*) FROM audit_log WHERE tool='vm_capacity_summary'").fetchone()[0]
+        assert count == 1
+    finally:
+        conn.close()
 
 
 def test_storage_tool_calls_are_audited(wired, gov_home):

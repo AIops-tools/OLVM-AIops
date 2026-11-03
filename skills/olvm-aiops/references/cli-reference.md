@@ -34,6 +34,7 @@ olvm-aiops host get <host-id>
 olvm-aiops storage list [--limit 100] [--json]
 olvm-aiops storage get <domain-id>
 olvm-aiops vm list [--search 'status=up'] [--limit 100] [--page 1] [--json]
+olvm-aiops vm capacity [--page-size 100] [--max-pages 100] [--json]
 olvm-aiops vm get <vm-id>
 olvm-aiops vm stats <vm-id>
 ```
@@ -43,6 +44,9 @@ and an optional `sortby` clause. Use `--page` for VM pagination instead of
 putting `page N` inside `--search`. Keep the same limit and search for each
 page, and follow the JSON `nextPage` until null. The engine has no atomic total
 count and may change between pages.
+For agent-facing VM lists, use `--limit 20`. `vm capacity` aggregates inside the
+server and reports `complete: false` with an `incompleteReason` when a full
+count or ratio cannot be supported. It does not produce an atomic snapshot.
 
 ## Activity
 

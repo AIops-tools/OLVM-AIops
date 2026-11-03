@@ -1,4 +1,4 @@
-# olvm-aiops — Capabilities (17 MCP tools: 15 read, 2 undo)
+# olvm-aiops — Capabilities (18 MCP tools: 16 read, 2 undo)
 
 Every diagnosis and listing is `[READ]`, `risk_level=low`; the harness's `undo_apply` is
 `[WRITE]` (nothing records an undo in this release). All are wrapped by `@governed_tool`
@@ -40,6 +40,7 @@ still inside the window; `eventsOutsideWindow` counts the older ones that were r
 | `host_list` / `host_get` | `/hosts` (`search` passed through) | `status`, `statusDetail`, `spmStatus`, `memoryBytes`, `maxSchedulingMemoryBytes`, `vmsActive`/`vmsTotal`, CPU topology, `osVersion`, `updateAvailable`, `reinstallationRequired` |
 | `storage_domain_list` / `storage_domain_get` | `/storagedomains` + `/datacenters/{id}/storagedomains` | `status` + `statusSource` (`dataCenter` / `global` / null), `master`, `availableBytes`, `usedBytes`, `committedBytes`, `totalBytes`, `usedPct`, `freePct`, `committedPctOfTotal`, thresholds; `statusErrors` |
 | `vm_list` / `vm_get` | `/vms` (`search` passed through) | `status`, `hostId`, `vcpus`, `memoryBytes`, `highAvailability`, `restartPendingForConfig`, `startTime`, `stopTime` |
+| `vm_capacity_summary` | ordered `/vms` pages and `/hosts` | Compact VM/vCPU count, physical cores and assignment ratio; `complete=false` and null totals when required data are missing; never an atomic snapshot |
 | `vm_stats` | `/vms/{id}/statistics` | `{name: {value, unit}}` — memory bytes, CPU %, network, `disks.usage`, `elapsed.time` |
 
 Why storage status is joined: an attached domain has no `status` in `/storagedomains`

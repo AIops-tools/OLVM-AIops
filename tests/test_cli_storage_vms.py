@@ -29,7 +29,8 @@ def wired(monkeypatch):
     vm = run("vm_after")
     routes = {"/storagedomains": glob,
               f"/datacenters/{dc_id}/storagedomains": run("datacenter_storagedomains"),
-              "/vms": {"vm": [vm]}, f"/vms/{vm['id']}/statistics": run("vm_statistics"),
+              "/vms": {"vm": [vm]}, "/hosts": run("hosts"),
+              f"/vms/{vm['id']}/statistics": run("vm_statistics"),
               "/events": {}}
     conn = MagicMock()
     def get(path, params=None):
@@ -79,6 +80,13 @@ def test_vm_list_page_option_reaches_the_engine(wired):
     assert r.exit_code == 0, r.output
     out = json.loads(r.stdout)
     assert out["vms"] == [] and out["page"] == 2 and out["nextPage"] is None
+
+
+def test_vm_capacity_command_returns_compact_summary(wired):
+    result = runner.invoke(app, ["vm", "capacity", "--json"])
+    assert result.exit_code == 0, result.output
+    out = json.loads(result.stdout)
+    assert out["vmCount"] == 1 and "vms" not in out
 
 
 @pytest.fixture(autouse=True)

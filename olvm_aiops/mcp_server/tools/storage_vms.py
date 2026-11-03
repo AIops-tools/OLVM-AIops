@@ -44,12 +44,34 @@ def vm_list(limit: int = 100, search: Optional[str] = None,
     """[READ] VMs with status, host, vCPUs, memory and high-availability flag.
 
     Args:
-        limit: Rows per page, 1-1000 (default 100).
+        limit: Rows per page, 1-1000 (default 100); agents should use 20 or fewer
+            so the model sees the entire page and its continuation metadata.
         search: Engine criteria, e.g. "status=up" or "cluster=Default"; omit `page`.
         target: Engine target name from config; omit to use the default.
         page: One-based page number (default 1). Follow `nextPage` until null.
     """
     return vms.list_vms(_get_connection(target), limit=limit, search=search, page=page)
+
+
+@mcp.tool()
+@governed_tool(risk_level="low")
+@tool_errors("dict")
+def vm_capacity_summary(page_size: int = 100, max_pages: int = 100,
+                        target: Optional[str] = None) -> dict:
+    """[READ] Compact VM count, configured vCPUs, host cores and assignment ratio.
+
+    Walks VM pages inside the server; no VM rows enter the model context. A
+    completed walk is not an atomic snapshot if the inventory changes during it.
+    Missing CPU values, duplicate VM ids, or page/host limits make `complete`
+    false and prevent unsupported totals.
+
+    Args:
+        page_size: VM rows per engine request, 1-1000 (default 100).
+        max_pages: Maximum VM pages to walk, 1-100 (default 100).
+        target: Engine target name from config; omit to use the default.
+    """
+    return vms.capacity_summary(_get_connection(target), page_size=page_size,
+                                max_pages=max_pages)
 
 
 @mcp.tool()

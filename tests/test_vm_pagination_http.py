@@ -13,13 +13,14 @@ import httpx
 import pytest
 
 from olvm_aiops.connection import OlvmConnection
-from olvm_aiops.ops.vms import list_vms
+from olvm_aiops.ops.vms import capacity_summary, list_vms
 
 pytestmark = pytest.mark.unit
 
 
 def test_vm_pages_over_http_use_constant_max_and_encoded_search():
-    inventory = [{"id": str(i), "name": f"vm-{i}"} for i in range(1, 6)]
+    inventory = [{"id": str(i), "name": f"vm-{i}", "cpu": {"topology": {
+        "sockets": "1", "cores": str(i), "threads": "1"}}} for i in range(1, 6)]
     seen: list[tuple[int, int, str]] = []
 
     class Engine(BaseHTTPRequestHandler):
@@ -44,16 +45,26 @@ def test_vm_pages_over_http_use_constant_max_and_encoded_search():
 
         def do_GET(self):
             parsed = urlparse(self.path)
-            if parsed.path != "/ovirt-engine/api/vms":
+            if parsed.path not in ("/ovirt-engine/api/vms", "/ovirt-engine/api/hosts"):
                 self.respond(404, {"fault": {"reason": "unknown endpoint"}})
                 return
             if self.headers.get("Authorization") != "Bearer stub-token":
                 self.respond(401, {"fault": {"reason": "missing token"}})
                 return
             params = parse_qs(parsed.query)
+            if parsed.path == "/ovirt-engine/api/hosts":
+                assert params == {"max": ["1001"]}
+                self.respond(200, {"host": [{"id": "host-1", "cpu": {"topology": {
+                    "sockets": "2", "cores": "4", "threads": "2"}}}]})
+                return
             size = int(params["max"][0])
             query = params["search"][0]
-            match = re.fullmatch(r"sortby name page (\d+)", query)
+            # Observed on two live OLVM 4.5.5 engines: omitting the sort
+            # direction can return HTTP 200 with an empty VM collection.
+            if re.fullmatch(r"sortby name page \d+", query):
+                self.respond(200, {"vm": []})
+                return
+            match = re.fullmatch(r"sortby name asc page (\d+)", query)
             if not match:
                 self.respond(400, {"fault": {"reason": "bad search"}})
                 return
@@ -80,9 +91,15 @@ def test_vm_pages_over_http_use_constant_max_and_encoded_search():
             number = result["nextPage"]
         assert [[vm["id"] for vm in p["vms"]] for p in pages] == [
             ["1", "2"], ["3", "4"], ["5"]]
-        assert seen == [(2, 1, "sortby name page 1"), (2, 2, "sortby name page 2"),
-                        (2, 2, "sortby name page 2"), (2, 3, "sortby name page 3"),
-                        (2, 3, "sortby name page 3")]
+        assert seen == [(2, 1, "sortby name asc page 1"),
+                        (2, 2, "sortby name asc page 2"),
+                        (2, 2, "sortby name asc page 2"),
+                        (2, 3, "sortby name asc page 3"),
+                        (2, 3, "sortby name asc page 3")]
+        summary = capacity_summary(conn, page_size=2)
+        assert summary["complete"] is True and summary["vmCount"] == 5
+        assert summary["configuredVcpus"] == 15 and summary["physicalCores"] == 8
+        assert summary["assignmentRatioPct"] == 187.5 and "vms" not in summary
     finally:
         if conn is not None:
             conn.close()

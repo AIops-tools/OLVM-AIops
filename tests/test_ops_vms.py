@@ -48,8 +48,8 @@ def test_list_passes_search_and_measures_truncation():
     assert out["returned"] == 2 and out["truncated"] is True
     assert out["page"] == 1 and out["nextPage"] == 2 and out["total"] is None
     assert [call.kwargs["params"] for call in conn.get.call_args_list] == [
-        {"max": "2", "search": "status=up sortby name page 1"},
-        {"max": "2", "search": "status=up sortby name page 2"},
+        {"max": "2", "search": "status=up sortby name asc page 1"},
+        {"max": "2", "search": "status=up sortby name asc page 2"},
     ]
 
 
@@ -62,7 +62,7 @@ def test_vm_list_pages_cover_inventory_without_shifting_boundaries():
     def get(path, params):
         assert path == "/vms"
         assert params["max"] == "2"  # max is page size, never limit + 1
-        assert params["search"].startswith("sortby name page ")
+        assert params["search"].startswith("sortby name asc page ")
         page = int(re.search(r"page (\d+)$", params["search"]).group(1))
         calls.append(page)
         return {"vm": inventory[(page - 1) * 2:page * 2]}
@@ -87,6 +87,10 @@ def test_vm_list_preserves_explicit_sort_and_refuses_conflicting_page():
     assert out["page"] == 3 and out["nextPage"] is None
     conn.get.assert_called_once_with(
         "/vms", params={"max": "100", "search": "status=up sortby name desc page 3"})
+    conn.reset_mock()
+    vms.list_vms(conn, search="status=up sortby name")
+    conn.get.assert_called_once_with(
+        "/vms", params={"max": "100", "search": "status=up sortby name asc page 1"})
     for bad in (0, -1, True, "2"):
         with pytest.raises(ValueError, match="page must"):
             vms.list_vms(conn, page=bad)
@@ -98,6 +102,99 @@ def test_vm_list_refuses_malformed_rows_instead_of_claiming_last_page():
     conn = _conn({"vm": [{"id": "1", "name": "vm-1"}, None]})
     with pytest.raises(ValueError, match="non-object VM"):
         vms.list_vms(conn, limit=2)
+
+
+def test_capacity_summary_aggregates_without_returning_vm_rows():
+    inventory = [{"id": str(i), "name": f"vm-{i}", "cpu": {"topology": {
+        "sockets": "1", "cores": str(i), "threads": "1"}}} for i in range(1, 6)]
+    hosts = [{"id": "h1", "cpu": {"topology": {"sockets": "2", "cores": "4"}}},
+             {"id": "h2", "cpu": {"topology": {"sockets": "1", "cores": "4"}}}]
+    calls = []
+
+    def get(path, params):
+        calls.append((path, params))
+        if path == "/vms":
+            assert params["max"] == "2"
+            assert params["search"].startswith("sortby name asc page ")
+            page = int(re.search(r"page (\d+)$", params["search"]).group(1))
+            return {"vm": inventory[(page - 1) * 2:page * 2]}
+        assert path == "/hosts" and params == {"max": "1001"}
+        return {"host": hosts}
+
+    conn = MagicMock()
+    conn.get.side_effect = get
+    out = vms.capacity_summary(conn, page_size=2)
+    assert out["complete"] is True and out["snapshotConsistent"] is False
+    assert out["vmCount"] == 5 and out["configuredVcpus"] == 15
+    assert out["physicalCores"] == 12 and out["assignmentRatioPct"] == 125.0
+    assert out["pagesRead"] == 3 and out["hostsEvaluated"] == 2
+    assert "vms" not in out and len(str(out)) < 600
+    assert calls[-1][0] == "/hosts"
+
+
+def test_capacity_summary_marks_missing_cpu_and_page_cap_incomplete():
+    inventory = [{"id": str(i), "name": f"vm-{i}"} for i in range(1, 6)]
+
+    def get(path, params):
+        if path == "/vms":
+            page = int(re.search(r"page (\d+)$", params["search"]).group(1))
+            return {"vm": inventory[(page - 1) * 2:page * 2]}
+        return {"host": []}
+
+    conn = MagicMock()
+    conn.get.side_effect = get
+    capped = vms.capacity_summary(conn, page_size=2, max_pages=2)
+    assert capped["complete"] is False and capped["vmCount"] is None
+    assert capped["observedVmCount"] == 4 and capped["incompleteReason"] == "page_limit"
+    full = vms.capacity_summary(conn, page_size=2)
+    assert full["vmCount"] == 5 and full["configuredVcpus"] is None
+    assert full["vmsMissingVcpus"] == 5 and full["complete"] is False
+    with pytest.raises(ValueError, match="max_pages"):
+        vms.capacity_summary(conn, max_pages=101)
+
+
+def test_capacity_summary_refuses_duplicates_and_unknown_host_cores():
+    rows = [{"id": "same", "name": "vm-a", "cpu": {"topology": {
+        "sockets": "1", "cores": "1", "threads": "1"}}},
+            {"id": "same", "name": "vm-b", "cpu": {"topology": {
+                "sockets": "1", "cores": "2", "threads": "1"}}}]
+
+    def duplicate_get(path, params):
+        page = int(re.search(r"page (\d+)$", params["search"]).group(1))
+        return {"vm": rows[page - 1:page]}
+
+    conn = MagicMock()
+    conn.get.side_effect = duplicate_get
+    duplicate = vms.capacity_summary(conn, page_size=1)
+    assert duplicate["complete"] is False and duplicate["incompleteReason"] == "duplicate_vm_id"
+    assert duplicate["vmCount"] is None and duplicate["configuredVcpus"] is None
+
+    def missing_host_get(path, params):
+        if path == "/vms":
+            return {"vm": [rows[0]]}
+        return {"host": [{"id": "h1", "cpu": {"topology": {"sockets": "2"}}}]}
+
+    conn.get.side_effect = missing_host_get
+    unknown = vms.capacity_summary(conn, page_size=2)
+    assert unknown["vmCount"] == 1 and unknown["configuredVcpus"] == 1
+    assert unknown["physicalCores"] is None and unknown["assignmentRatioPct"] is None
+    assert unknown["complete"] is False
+    assert unknown["incompleteReason"] == "missing_host_cpu_topology"
+
+
+def test_capacity_summary_does_not_silently_drop_bad_host_rows():
+    vm = {"id": "vm-1", "cpu": {"topology": {
+        "sockets": "1", "cores": "2", "threads": "1"}}}
+
+    def get(path, params):
+        if path == "/vms":
+            return {"vm": [vm]}
+        return {"host": [{"id": "host-1"}, None]}
+
+    conn = MagicMock()
+    conn.get.side_effect = get
+    with pytest.raises(ValueError, match="non-object host"):
+        vms.capacity_summary(conn)
 
 
 def test_statistics_keep_ints_and_floats_and_units():

@@ -19,7 +19,8 @@ EXPECTED_TOOLS = {
     "undo_list", "undo_apply",
     "datacenter_list", "cluster_list", "host_list", "host_get",
     "event_list", "job_list", "host_health_rca",
-    "storage_domain_list", "storage_domain_get", "vm_list", "vm_get", "vm_stats",
+    "storage_domain_list", "storage_domain_get", "vm_list", "vm_capacity_summary",
+    "vm_get", "vm_stats",
     "storage_capacity_rca", "vm_health_rca",
 }
 
@@ -96,6 +97,7 @@ def test_cli_leaf_help_triggers_lazy_imports():
         ["job", "list", "--help"],
         ["storage", "list", "--help"], ["storage", "get", "--help"],
         ["storage", "capacity", "--help"], ["vm", "list", "--help"],
+        ["vm", "capacity", "--help"],
         ["vm", "get", "--help"], ["vm", "stats", "--help"],
         ["vm", "health", "--help"],
     ):

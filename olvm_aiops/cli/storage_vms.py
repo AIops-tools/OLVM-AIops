@@ -109,6 +109,34 @@ def vm_list(limit: int = LimitOption,
                       f"and the same --limit/--search.[/]")
 
 
+@vm_app.command("capacity")
+@cli_errors
+def vm_capacity(page_size: int = typer.Option(100, "--page-size", min=1, max=1000,
+                                         help="VM rows per internal engine page."),
+                max_pages: int = typer.Option(100, "--max-pages", min=1, max=100,
+                                              help="Maximum VM pages to scan."),
+                as_json: bool = JsonOption, target: TargetOption = None) -> None:
+    """Compact engine-wide VM/vCPU to host-core assignment summary."""
+    from olvm_aiops.mcp_server.tools import storage_vms
+
+    out = governed(storage_vms.vm_capacity_summary(page_size=page_size,
+                                                   max_pages=max_pages, target=target))
+    if as_json:
+        print_json(out)
+        return
+    def shown(key: str) -> str:
+        return str(out[key]) if out[key] is not None else "unknown"
+
+    console.print(f"VMs: {shown('vmCount')}; configured vCPUs: {shown('configuredVcpus')}; "
+                  f"physical host cores: {shown('physicalCores')}")
+    ratio = out["assignmentRatioPct"]
+    console.print(f"vCPU/core assignment: {ratio:.1f}%" if ratio is not None
+                  else "vCPU/core assignment: unknown")
+    if not out["complete"]:
+        console.print(f"[yellow]PARTIAL: {escape(out['incompleteReason'])}.[/]")
+    console.print("[yellow]Stateless engine pages do not provide an atomic snapshot.[/]")
+
+
 @vm_app.command("get")
 @cli_errors
 def vm_get(vm_id: str = typer.Argument(..., help="VM id."), target: TargetOption = None) -> None:

@@ -278,14 +278,27 @@ defines `search=page N` with `max` as the page size and warns that the API is
 stateless: concurrent changes can duplicate or omit objects between pages.
 The [VM list method](https://github.com/oVirt/ovirt-engine-api-model/blob/master/src/main/java/services/VmsService.java)
 guarantees ordering only when `sortby` is present. `vm_list` therefore adds a
-default `sortby name`, uses the same `max` on every page, and probes the next
+default `sortby name asc`, uses the same `max` on every page, and probes the next
 page before reporting `truncated` / `nextPage`. A fake that implements these
 server semantics verifies that five VMs cross three pages without a shifted
 boundary. A local HTTP server test also exercises SSO login, real httpx query
 encoding and the same page walk through `OlvmConnection`. The CLI and MCP inputs
 both expose `page`.
 
-**Not live-verified on a large OLVM engine:** no configured engine was available
-in this workspace. No exact `total` or snapshot-consistency claim is made; a
-real inventory with more than 1000 VMs and concurrent create/delete activity
-remains the follow-up verification target.
+**Live feedback, 2026-11-03:** [the issue reporter](https://github.com/AIops-tools/OLVM-AIops/issues/2#issuecomment-6592780162)
+walked both OLVM 4.5.5 targets with `sortby name asc`, `limit=20`: manager02
+returned 61 unique VMs across four pages, no duplicates, 600 configured vCPUs,
+and a final null `nextPage`; manager03 returned one VM and four vCPUs. No VM
+was missing `vcpus`. The same engines returned HTTP 200 and zero VMs for our
+generated `sortby name page 1`; the new regression fake reproduces that observed
+response before testing the explicit `asc` fix. The reporter also observed
+`limit=1000` clipped by the MCP client before the model saw all rows and the
+pagination metadata; the model then calculated from the visible subset. Skill
+guidance now uses 20-row pages and forbids totals from clipped results.
+
+`vm_capacity_summary` is **not live-verified**. Unit fakes and a real HTTP client
+against a local engine stub verify complete pages, missing CPU values, duplicate
+VM IDs, a page cap, host topology and compact output. `complete` means the page
+walk finished and every required metric was available; it does not mean a
+single consistent snapshot. Concurrent create/delete activity and an inventory
+larger than 1000 VMs remain unverified.

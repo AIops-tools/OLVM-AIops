@@ -60,6 +60,11 @@ what any model decides. Do not rely on prompt wording for this.
    is a planning limit; only a low-space or critical-blocker finding means it is running out.
 11. **Do not fabricate write operations.** This release cannot start, stop, migrate or snapshot;
    say so instead of describing a result.
+12. **Keep VM pages small for agents.** Use `vm_list(limit=20)` and follow `nextPage`.
+    If a page or continuation metadata is clipped, do not compute totals or rankings from
+    the visible subset. For VM count, configured vCPUs and host-core assignment, use
+    `vm_capacity_summary`; quote totals only when `complete` is true, and state that
+    `snapshotConsistent` is false even for a completed scan.
 
 ## Recommended setup for a local model
 

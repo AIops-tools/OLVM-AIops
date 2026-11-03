@@ -2,8 +2,8 @@
   "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
   "name": "olvm-aiops",
   "displayName": "OLVM AIops",
-  "version": "0.7.1",
-  "description": "Governed OLVM / oVirt 4.5 ops — 17 MCP tools: inventory, health, capacity, diagnosis; audited.",
+  "version": "0.7.2",
+  "description": "Governed OLVM / oVirt 4.5 ops — 18 MCP tools: inventory, health, capacity, diagnosis; audited.",
   "author": {
     "name": "Wei Zhou",
     "email": "zhouwei008@gmail.com",

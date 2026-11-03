@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.7.2 — 2026-11-03
+
+### Fixed
+- Default `vm_list` searches now use `sortby name asc`. Two live OLVM 4.5.5 engines returned HTTP 200 with zero VMs for `sortby name` without a direction. Caller-supplied bare `sortby` clauses also gain `asc`.
+- Agent guidance now uses 20-row VM pages and rejects fleet totals from a clipped MCP response.
+
+### Added
+- `vm_capacity_summary` / `olvm-aiops vm capacity` aggregates VM count, configured vCPUs, physical host cores and assignment ratio inside the server, without sending VM rows to the model. It marks incomplete scans and unavailable metrics explicitly; stateless pages never promise an atomic snapshot.
+
 ## v0.7.1 — 2026-11-02
 
 ### Fixed

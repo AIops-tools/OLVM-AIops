@@ -40,6 +40,7 @@ COMMANDS = [
     (["storage", "get", "{sd}"], "storage_domain_get"),
     (["storage", "capacity"], "storage_capacity_rca"),
     (["vm", "list"], "vm_list"),
+    (["vm", "capacity"], "vm_capacity_summary"),
     (["vm", "get", "{vm}"], "vm_get"),
     (["vm", "stats", "{vm}"], "vm_stats"),
     (["vm", "health"], "vm_health_rca"),
